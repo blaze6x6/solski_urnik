@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FileDown } from "lucide-react";
 
-export type PdfStyle = "bw" | "color";
+export type PdfStyle = "bw" | "color" | "app";
 
 /** Gumb »Izvozi PDF« z izbiro: črno-bel (za tisk) ali barvni (kot v aplikaciji). */
 export function PdfMenu({
@@ -46,7 +46,11 @@ export function PdfMenu({
             </button>
             <button type="button" role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-paper-deep" onClick={() => choose("color")}>
               <span className="block font-semibold">Barvni</span>
-              <span className="block text-xs text-ink-faint">Kot ga prikazuje aplikacija</span>
+              <span className="block text-xs text-ink-faint">Poenostavljene barve</span>
+            </button>
+            <button type="button" role="menuitem" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-paper-deep" onClick={() => choose("app")}>
+              <span className="block font-semibold">Kot v aplikaciji</span>
+              <span className="block text-xs text-ink-faint">Enak videz, samo ime otroka</span>
             </button>
           </div>
         </>
