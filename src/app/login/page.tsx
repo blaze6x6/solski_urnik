@@ -12,7 +12,8 @@ const FEATURES = [
   { icon: GraduationCap, text: "Ocene, beležke in šolski koledar" },
 ];
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ ponastavljeno?: string }> }) {
+  const sp = await searchParams;
   const user = await getSessionUser();
   if (user) redirect("/");
 
@@ -78,7 +79,7 @@ export default async function LoginPage() {
             Zasebni dostop za administratorja družinskega urnika.
           </p>
 
-          <LoginForm />
+          <LoginForm resetDone={sp.ponastavljeno === "1"} />
 
         </div>
         <SiteFooter />
