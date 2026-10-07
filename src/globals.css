@@ -1,0 +1,752 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+
+  --color-paper: #f4f6f8;
+  --color-paper-deep: #e6ebf0;
+  --color-card: #ffffff;
+  --color-input: #fffefb;
+  /* stranska vrstica: rahel odtenek teme na površini kartice */
+  --color-side: color-mix(in srgb, var(--color-brand-tint) 55%, var(--color-card));
+  --color-ink: #16202b;
+  --color-ink-soft: #566475;
+  --color-ink-faint: #93a0b0;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-spruce: #06a66b;
+  --color-spruce-deep: #048a58;
+  --color-spruce-2: #06b3b8;
+  --color-spruce-2-deep: #0697a0;
+  --color-brand-tint: #eafaf3;
+  --color-brand-border: #8fdcc0;
+  --color-brand-ink: #056848;
+  --color-brand-selection: #bdf0da;
+  --color-amber: #f58316;
+  --color-amber-2: #f0a500;
+  --color-amber-deep: #e0740c;
+  --color-amber-2-deep: #d89400;
+  --color-amber-ink: #a9540a;
+  --color-amber-strong: #d96c06;
+  --color-amber-soft: #fff0da;
+  --color-on-amber: #2b1d05;
+  --color-clay: #ec2f55;
+  --color-holiday: #ec2f55;
+  --color-azure: #1d7ff0;
+}
+
+html {
+  color-scheme: light;
+}
+:root[data-mode="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-feature-settings: "ss01" on, "cv11" on;
+}
+
+::selection {
+  background: var(--color-brand-selection);
+  color: var(--color-brand-ink);
+}
+
+/* Tanek, topel drsnik */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 8px;
+  border: 3px solid var(--color-paper);
+}
+
+/* Zrnata tekstura za globino */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* Sestavljeni elementi */
+@layer components {
+  .card {
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: 1.25rem;
+    box-shadow:
+      0 1px 0 rgba(29, 33, 38, 0.02),
+      0 16px 40px -28px rgba(29, 33, 38, 0.25);
+  }
+
+  .input {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-input);
+    padding: 0.55rem 0.85rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input::placeholder {
+    color: var(--color-ink-faint);
+  }
+  .input:focus {
+    border-color: var(--color-spruce);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-spruce) 16%, transparent);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-soft);
+    margin-bottom: 0.35rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.55rem 1.1rem;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--color-spruce) 0%, var(--color-spruce-2) 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--color-spruce) 65%, transparent);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, var(--color-spruce-deep) 0%, var(--color-spruce-2-deep) 100%);
+    box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--color-spruce) 80%, transparent);
+  }
+  .btn-ghost {
+    background: var(--color-card);
+    color: var(--color-ink-soft);
+    border: 1px solid var(--color-line-strong);
+  }
+  /* na belih karticah mora hover ostati viden -> rahel barvni nadih */
+  .btn-ghost:hover {
+    background: var(--color-brand-tint);
+    border-color: var(--color-brand-border);
+    color: var(--color-brand-ink);
+  }
+  .btn-amber {
+    background: linear-gradient(135deg, var(--color-amber) 0%, var(--color-amber-2) 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 26px -12px color-mix(in srgb, var(--color-amber) 70%, transparent);
+  }
+  .btn-amber:hover {
+    background: linear-gradient(135deg, var(--color-amber-deep) 0%, var(--color-amber-2-deep) 100%);
+    box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--color-amber) 85%, transparent);
+  }
+  .btn-danger {
+    background: var(--color-card);
+    color: #d41f45;
+    border: 1px solid #fbc9d4;
+  }
+  .btn-danger:hover {
+    background: #ffe3e9;
+    border-color: #f6a6b8;
+    color: #a4123a;
+  }
+  .btn[disabled] {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  /* Izbirni čip (npr. izbira otroka) — viden hover tudi na beli kartici */
+  .chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-card);
+    color: var(--color-ink-soft);
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+      box-shadow 0.15s ease, transform 0.15s ease;
+    cursor: pointer;
+  }
+  .chip-btn:hover {
+    background: var(--color-brand-tint);
+    border-color: var(--color-brand-border);
+    color: var(--color-brand-ink);
+  }
+  .chip-btn:active {
+    transform: translateY(1px);
+  }
+  .chip-btn-active {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--color-spruce) 0%, var(--color-spruce-2) 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--color-spruce) 75%, transparent);
+  }
+  .chip-btn-active:hover {
+    background: linear-gradient(135deg, var(--color-spruce-deep) 0%, var(--color-spruce-2-deep) 100%);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  /* Ikonski gumb v vrsticah seznamov */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.6rem;
+    padding: 0.375rem;
+    color: var(--color-ink-soft);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .icon-btn:hover {
+    background: var(--color-paper-deep);
+    color: var(--color-ink);
+  }
+
+  .tab-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+  .tab-link:hover {
+    background: var(--color-brand-tint);
+    color: var(--color-brand-ink);
+  }
+  .tab-link-active:hover {
+    background: linear-gradient(135deg, var(--color-spruce-deep) 0%, var(--color-spruce-2-deep) 100%);
+    color: #ffffff;
+  }
+  .tab-link-active {
+    background: linear-gradient(135deg, var(--color-spruce) 0%, var(--color-spruce-2) 100%);
+    color: #ffffff;
+    box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--color-spruce) 70%, transparent);
+  }
+}
+
+/* Modalno okno */
+@keyframes sheet-up {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.sheet-in {
+  animation: sheet-up 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+/* Živi indikator "zdaj" */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.82); }
+}
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* Diagonalni vzorec za prekrite ure (dogodki) */
+.stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(29, 33, 38, 0.05) 0,
+    rgba(29, 33, 38, 0.05) 5px,
+    transparent 5px,
+    transparent 11px
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Tiskanje — urejena ena stran z urnikom, brez okolice
+--------------------------------------------------------------------------- */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+  .print-area .card,
+  .print-area table {
+    box-shadow: none !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  /* vsak otrok na svojo stran pri tiskanju vseh urnikov */
+  .print-area > section {
+    break-inside: avoid;
+  }
+}
+
+/* Drsenje urnika ob menjavi tedna (samo vsebina urnika, ne cela stran) */
+@keyframes week-in-next {
+  from { opacity: 0.35; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes week-in-prev {
+  from { opacity: 0.35; transform: translateX(-28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.week-slide-next { animation: week-in-next 220ms ease-out; }
+.week-slide-prev { animation: week-in-prev 220ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .week-slide-next, .week-slide-prev { animation: none; }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Barvne teme: [data-theme] na <html> prepiše samo spremenljivke blagovne     */
+/* znamke. Pisave, razmiki in oblike gumbov ostanejo enaki; gumbi, zavihki,    */
+/* poudarki in ozadja pa se obarvajo samodejno prek teh spremenljivk.          */
+/* Smaragd je privzeta tema (vrednosti v @theme zgoraj).                       */
+/* ------------------------------------------------------------------------- */
+:root[data-theme="ocean"] {
+  --color-paper: #f2f6fb;
+  --color-paper-deep: #e3ebf5;
+  --color-spruce: #1d7ff0;
+  --color-spruce-deep: #1566c8;
+  --color-spruce-2: #0bb3ea;
+  --color-spruce-2-deep: #0993c0;
+  --color-brand-tint: #eaf3ff;
+  --color-brand-border: #9cc7f7;
+  --color-brand-ink: #15539c;
+  --color-brand-selection: #cfe3fb;
+}
+:root[data-theme="sliva"] {
+  --color-paper: #f7f4fb;
+  --color-paper-deep: #ebe5f4;
+  --color-spruce: #8b45e8;
+  --color-spruce-deep: #7230c9;
+  --color-spruce-2: #c13fd9;
+  --color-spruce-2-deep: #a52fbc;
+  --color-brand-tint: #f4ecff;
+  --color-brand-border: #cfb1f5;
+  --color-brand-ink: #5c21a8;
+  --color-brand-selection: #e3d2fa;
+  --color-amber: #e0338f;
+  --color-amber-2: #f472b6;
+  --color-amber-deep: #c0267a;
+  --color-amber-2-deep: #d85a9e;
+  --color-amber-ink: #9c0f5d;
+  --color-amber-strong: #b91c6e;
+  --color-amber-soft: #ffe4f1;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="mandarina"] {
+  --color-paper: #faf5f0;
+  --color-paper-deep: #f1e7dc;
+  --color-spruce: #ea6a0a;
+  --color-spruce-deep: #c85a05;
+  --color-spruce-2: #f0a500;
+  --color-spruce-2-deep: #d89400;
+  --color-brand-tint: #fff3e6;
+  --color-brand-border: #ffc98a;
+  --color-brand-ink: #a9540a;
+  --color-brand-selection: #ffdcb8;
+  --color-amber: #1d7ff0;
+  --color-amber-2: #0bb3ea;
+  --color-amber-deep: #1566c8;
+  --color-amber-2-deep: #0993c0;
+  --color-amber-ink: #15539c;
+  --color-amber-strong: #1566c8;
+  --color-amber-soft: #dbeafe;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="turkiz"] {
+  --color-paper: #ecf3f4;
+  --color-paper-deep: #d5e4e8;
+  --color-spruce: #0d9488;
+  --color-spruce-deep: #0b7c72;
+  --color-spruce-2: #22b8cf;
+  --color-spruce-2-deep: #1d9bae;
+  --color-brand-tint: #e7f4f3;
+  --color-brand-border: #99d2cd;
+  --color-brand-ink: #08564f;
+  --color-brand-selection: #cae7e5;
+  --color-amber: #f59e0b;
+  --color-amber-2: #f5ab07;
+  --color-amber-deep: #d38809;
+  --color-amber-2-deep: #d39306;
+  --color-amber-ink: #986207;
+  --color-amber-strong: #c47e09;
+  --color-amber-soft: #fef3e2;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="roza"] {
+  --color-paper: #f5edf3;
+  --color-paper-deep: #e6dbe6;
+  --color-spruce: #e11d74;
+  --color-spruce-deep: #bd1861;
+  --color-spruce-2: #fb6fa6;
+  --color-spruce-2-deep: #d35d8b;
+  --color-brand-tint: #fce8f1;
+  --color-brand-border: #f2a0c5;
+  --color-brand-ink: #831143;
+  --color-brand-selection: #f8cde0;
+  --color-amber: #7c3aed;
+  --color-amber-2: #945df0;
+  --color-amber-deep: #6b32cc;
+  --color-amber-2-deep: #7f50ce;
+  --color-amber-ink: #4d2493;
+  --color-amber-strong: #632ebe;
+  --color-amber-soft: #efe7fd;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="indigo"] {
+  --color-paper: #eeeff8;
+  --color-paper-deep: #dadeef;
+  --color-spruce: #4f46e5;
+  --color-spruce-deep: #423bc0;
+  --color-spruce-2: #7c83f5;
+  --color-spruce-2-deep: #686ece;
+  --color-brand-tint: #edecfc;
+  --color-brand-border: #b5b1f4;
+  --color-brand-ink: #2e2985;
+  --color-brand-selection: #d8d6f9;
+  --color-amber: #ec4899;
+  --color-amber-2: #ef69ab;
+  --color-amber-deep: #cb3e84;
+  --color-amber-2-deep: #ce5a93;
+  --color-amber-ink: #922d5f;
+  --color-amber-strong: #bd3a7a;
+  --color-amber-soft: #fde9f3;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="gozd"] {
+  --color-paper: #edf2f1;
+  --color-paper-deep: #d7e3e2;
+  --color-spruce: #2e8b3d;
+  --color-spruce-deep: #277533;
+  --color-spruce-2: #7cb518;
+  --color-spruce-2-deep: #689814;
+  --color-brand-tint: #eaf3ec;
+  --color-brand-border: #a7ceae;
+  --color-brand-ink: #1b5123;
+  --color-brand-selection: #d1e5d4;
+  --color-amber: #d97706;
+  --color-amber-2: #e08f33;
+  --color-amber-deep: #bb6605;
+  --color-amber-2-deep: #c17b2c;
+  --color-amber-ink: #874a04;
+  --color-amber-strong: #ae5f05;
+  --color-amber-soft: #faefe1;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="rubin"] {
+  --color-paper: #f5eef1;
+  --color-paper-deep: #e5dce2;
+  --color-spruce: #d92d43;
+  --color-spruce-deep: #b62638;
+  --color-spruce-2: #f2607a;
+  --color-spruce-2-deep: #cb5166;
+  --color-brand-tint: #fbeaec;
+  --color-brand-border: #efa7b0;
+  --color-brand-ink: #7e1a27;
+  --color-brand-selection: #f7d1d6;
+  --color-amber: #0ea5e9;
+  --color-amber-2: #5fb097;
+  --color-amber-deep: #0c8ec8;
+  --color-amber-2-deep: #529782;
+  --color-amber-ink: #096690;
+  --color-amber-strong: #0b84ba;
+  --color-amber-soft: #e2f4fc;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="korala"] {
+  --color-paper: #f6f0f1;
+  --color-paper-deep: #e7e0e3;
+  --color-spruce: #f0654a;
+  --color-spruce-deep: #ca553e;
+  --color-spruce-2: #ff9b71;
+  --color-spruce-2-deep: #d6825f;
+  --color-brand-tint: #fef0ed;
+  --color-brand-border: #f9beb3;
+  --color-brand-ink: #8b3b2b;
+  --color-brand-selection: #fcddd7;
+  --color-amber: #0d9488;
+  --color-amber-2: #39a79d;
+  --color-amber-deep: #0b7f75;
+  --color-amber-2-deep: #319087;
+  --color-amber-ink: #085c54;
+  --color-amber-strong: #0a766d;
+  --color-amber-soft: #e2f2f1;
+  --color-on-amber: #ffffff;
+}
+:root[data-theme="skrilavec"] {
+  --color-paper: #eef0f3;
+  --color-paper-deep: #d9dfe5;
+  --color-spruce: #475569;
+  --color-spruce-deep: #3c4758;
+  --color-spruce-2: #64748b;
+  --color-spruce-2-deep: #546175;
+  --color-brand-tint: #edeef0;
+  --color-brand-border: #b2b8c0;
+  --color-brand-ink: #29313d;
+  --color-brand-selection: #d7dade;
+  --color-amber: #0ea5e9;
+  --color-amber-2: #39b5ed;
+  --color-amber-deep: #0c8ec8;
+  --color-amber-2-deep: #319ccc;
+  --color-amber-ink: #096690;
+  --color-amber-strong: #0b84ba;
+  --color-amber-soft: #e2f4fc;
+  --color-on-amber: #ffffff;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Varna območja: iPhone z izrezom/otokom, nameščena aplikacija (PWA) in      */
+/* ležeči položaj. Brez teh odmikov vsebina zaide pod statusno vrstico ali    */
+/* pod izrez ob strani.                                                       */
+/* ------------------------------------------------------------------------- */
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.safe-topbar {
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+}
+.safe-aside {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-bottomnav {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.safe-banner {
+  left: max(0.75rem, env(safe-area-inset-left));
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: calc(86px + env(safe-area-inset-bottom));
+}
+.safe-login {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+/* spodnja okna (modalna) na telefonu ne smejo segati pod črto za domov */
+@media (max-width: 639px) {
+  .sheet-in {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Temni način: [data-mode="dark"] (ali "auto" + nastavitev naprave).         */
+/* Površine in besedilo se zamenjajo s spremenljivkami; barve teme (gumbi,    */
+/* poudarki) ostanejo, njihove svetle različice pa se izpeljejo samodejno.    */
+/* Tiskanje je vedno svetlo.                                                  */
+/* ------------------------------------------------------------------------- */
+@media screen {
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --color-paper: color-mix(in srgb, var(--color-spruce) 5%, #0e1217);
+  --color-paper-deep: color-mix(in srgb, var(--color-spruce) 9%, #171c23);
+  --color-card: color-mix(in srgb, var(--color-spruce) 3%, #181d24);
+  --color-input: color-mix(in srgb, var(--color-spruce) 2%, #11161c);
+  --color-ink: #e8edf3;
+  --color-ink-soft: #a6b2c0;
+  --color-ink-faint: #79858f;
+  --color-line: #262e38;
+  --color-line-strong: #374250;
+  --color-brand-tint: color-mix(in srgb, var(--color-spruce) 17%, var(--color-card));
+  --color-brand-border: color-mix(in srgb, var(--color-spruce) 45%, var(--color-card));
+  --color-brand-ink: color-mix(in srgb, var(--color-spruce) 42%, #ffffff);
+  --color-brand-selection: color-mix(in srgb, var(--color-spruce) 38%, var(--color-card));
+  --color-amber-soft: color-mix(in srgb, var(--color-amber) 17%, var(--color-card));
+  --color-amber-ink: color-mix(in srgb, var(--color-amber) 45%, #ffffff);
+  --color-amber-strong: color-mix(in srgb, var(--color-amber) 62%, #ffffff);
+}
+:root[data-mode="dark"] .bg-white { background-color: var(--color-card); }
+:root[data-mode="dark"] .stripes { background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.07) 0, rgba(255,255,255,0.07) 5px, transparent 5px, transparent 11px); }
+:root[data-mode="dark"] .grain::before { opacity: 0.025; }
+:root[data-mode="dark"] [style*="background:#"]:not(.rounded-full), :root[data-mode="dark"] [style*="background: rgb"]:not(.rounded-full) { filter: brightness(0.8) saturate(1.05); }
+:root[data-mode="dark"] .btn-danger { color: #ff93a6; border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="dark"] .btn-danger:hover { background: color-mix(in srgb, #ec2f55 17%, var(--color-card)); color: #ffb3c0; }
+:root[data-mode="dark"] .bg-\[\#c9cfd6\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#d8f8ea\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#dbeafe\] { background-color: color-mix(in srgb, #1d7ff0 20%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#e3e2fd\] { background-color: color-mix(in srgb, #8b45e8 22%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eceff2\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eee3fd\] { background-color: color-mix(in srgb, #8b45e8 22%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eef4e4\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eef5ea\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eef5ef\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#eef8d6\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#f1f3f5\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#f1f8dc\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#f3fadf\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#faeeea\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#ffe3e9\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#fff0f3\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#fff8ef\] { background-color: color-mix(in srgb, #f59e0b 15%, var(--color-card)); }
+:root[data-mode="dark"] .bg-\[\#fffaf0\] { background-color: color-mix(in srgb, #f59e0b 15%, var(--color-card)); }
+:root[data-mode="dark"] .border-\[\#aeeccd\] { border-color: color-mix(in srgb, #16a34a 38%, var(--color-card)); }
+:root[data-mode="dark"] .border-\[\#cfe0c8\] { border-color: color-mix(in srgb, #16a34a 38%, var(--color-card)); }
+:root[data-mode="dark"] .border-\[\#e6c4ba\] { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="dark"] .border-\[\#fbc9d4\] { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="dark"] .border-\[\#ffd9b0\] { border-color: color-mix(in srgb, #f59e0b 38%, var(--color-card)); }
+:root[data-mode="dark"] .text-\[\#046c46\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#15539c\] { color: #8fc4ff; }
+:root[data-mode="dark"] .text-\[\#322ca0\] { color: #c8abff; }
+:root[data-mode="dark"] .text-\[\#3c5f2a\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#4e5c18\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#4f7a08\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#587f0a\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#5c21a8\] { color: #c8abff; }
+:root[data-mode="dark"] .text-\[\#5f8c0b\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#687a25\] { color: #8fe3b4; }
+:root[data-mode="dark"] .text-\[\#6b7480\] { color: #a6b2c0; }
+:root[data-mode="dark"] .text-\[\#8a939e\] { color: #a6b2c0; }
+:root[data-mode="dark"] .text-\[\#a03d2e\] { color: #ff93a6; }
+:root[data-mode="dark"] .text-\[\#a4123a\] { color: #ff93a6; }
+:root[data-mode="dark"] .text-\[\#c21742\] { color: #ff93a6; }
+:root[data-mode="dark"] .text-\[\#d41f45\] { color: #ff93a6; }
+:root[data-mode="dark"] .\!text-\[\#6b7480\] { color: #a6b2c0 !important; }
+:root[data-mode="dark"] .hover\:bg-\[\#faeeea\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="dark"] .hover\:bg-\[\#ffe3e9\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="dark"] .hover\:border-\[\#f6a6b8\]:hover { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="dark"] .hover\:\!bg-\[\#dbeafe\]:hover { background-color: color-mix(in srgb, #1d7ff0 20%, var(--color-card)) !important; }
+:root[data-mode="dark"] .hover\:\!bg-\[\#ffe3e9\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)) !important; }
+:root[data-mode="dark"] .hover\:\!text-\[\#15539c\]:hover { color: #8fc4ff !important; }
+:root[data-mode="dark"] .hover\:\!text-\[\#a4123a\]:hover { color: #ff93a6 !important; }
+:root[data-mode="dark"] .hover\:\!text-\[\#d41f45\]:hover { color: #ff93a6 !important; }
+}
+@media screen and (prefers-color-scheme: dark) {
+:root[data-mode="auto"] {
+  color-scheme: dark;
+  --color-paper: color-mix(in srgb, var(--color-spruce) 5%, #0e1217);
+  --color-paper-deep: color-mix(in srgb, var(--color-spruce) 9%, #171c23);
+  --color-card: color-mix(in srgb, var(--color-spruce) 3%, #181d24);
+  --color-input: color-mix(in srgb, var(--color-spruce) 2%, #11161c);
+  --color-ink: #e8edf3;
+  --color-ink-soft: #a6b2c0;
+  --color-ink-faint: #79858f;
+  --color-line: #262e38;
+  --color-line-strong: #374250;
+  --color-brand-tint: color-mix(in srgb, var(--color-spruce) 17%, var(--color-card));
+  --color-brand-border: color-mix(in srgb, var(--color-spruce) 45%, var(--color-card));
+  --color-brand-ink: color-mix(in srgb, var(--color-spruce) 42%, #ffffff);
+  --color-brand-selection: color-mix(in srgb, var(--color-spruce) 38%, var(--color-card));
+  --color-amber-soft: color-mix(in srgb, var(--color-amber) 17%, var(--color-card));
+  --color-amber-ink: color-mix(in srgb, var(--color-amber) 45%, #ffffff);
+  --color-amber-strong: color-mix(in srgb, var(--color-amber) 62%, #ffffff);
+}
+:root[data-mode="auto"] .bg-white { background-color: var(--color-card); }
+:root[data-mode="auto"] .stripes { background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.07) 0, rgba(255,255,255,0.07) 5px, transparent 5px, transparent 11px); }
+:root[data-mode="auto"] .grain::before { opacity: 0.025; }
+:root[data-mode="auto"] [style*="background:#"]:not(.rounded-full), :root[data-mode="auto"] [style*="background: rgb"]:not(.rounded-full) { filter: brightness(0.8) saturate(1.05); }
+:root[data-mode="auto"] .btn-danger { color: #ff93a6; border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="auto"] .btn-danger:hover { background: color-mix(in srgb, #ec2f55 17%, var(--color-card)); color: #ffb3c0; }
+:root[data-mode="auto"] .bg-\[\#c9cfd6\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#d8f8ea\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#dbeafe\] { background-color: color-mix(in srgb, #1d7ff0 20%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#e3e2fd\] { background-color: color-mix(in srgb, #8b45e8 22%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eceff2\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eee3fd\] { background-color: color-mix(in srgb, #8b45e8 22%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eef4e4\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eef5ea\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eef5ef\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#eef8d6\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#f1f3f5\] { background-color: color-mix(in srgb, #94a3b8 20%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#f1f8dc\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#f3fadf\] { background-color: color-mix(in srgb, #16a34a 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#faeeea\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#ffe3e9\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#fff0f3\] { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#fff8ef\] { background-color: color-mix(in srgb, #f59e0b 15%, var(--color-card)); }
+:root[data-mode="auto"] .bg-\[\#fffaf0\] { background-color: color-mix(in srgb, #f59e0b 15%, var(--color-card)); }
+:root[data-mode="auto"] .border-\[\#aeeccd\] { border-color: color-mix(in srgb, #16a34a 38%, var(--color-card)); }
+:root[data-mode="auto"] .border-\[\#cfe0c8\] { border-color: color-mix(in srgb, #16a34a 38%, var(--color-card)); }
+:root[data-mode="auto"] .border-\[\#e6c4ba\] { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="auto"] .border-\[\#fbc9d4\] { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="auto"] .border-\[\#ffd9b0\] { border-color: color-mix(in srgb, #f59e0b 38%, var(--color-card)); }
+:root[data-mode="auto"] .text-\[\#046c46\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#15539c\] { color: #8fc4ff; }
+:root[data-mode="auto"] .text-\[\#322ca0\] { color: #c8abff; }
+:root[data-mode="auto"] .text-\[\#3c5f2a\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#4e5c18\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#4f7a08\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#587f0a\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#5c21a8\] { color: #c8abff; }
+:root[data-mode="auto"] .text-\[\#5f8c0b\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#687a25\] { color: #8fe3b4; }
+:root[data-mode="auto"] .text-\[\#6b7480\] { color: #a6b2c0; }
+:root[data-mode="auto"] .text-\[\#8a939e\] { color: #a6b2c0; }
+:root[data-mode="auto"] .text-\[\#a03d2e\] { color: #ff93a6; }
+:root[data-mode="auto"] .text-\[\#a4123a\] { color: #ff93a6; }
+:root[data-mode="auto"] .text-\[\#c21742\] { color: #ff93a6; }
+:root[data-mode="auto"] .text-\[\#d41f45\] { color: #ff93a6; }
+:root[data-mode="auto"] .\!text-\[\#6b7480\] { color: #a6b2c0 !important; }
+:root[data-mode="auto"] .hover\:bg-\[\#faeeea\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="auto"] .hover\:bg-\[\#ffe3e9\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)); }
+:root[data-mode="auto"] .hover\:border-\[\#f6a6b8\]:hover { border-color: color-mix(in srgb, #ec2f55 38%, var(--color-card)); }
+:root[data-mode="auto"] .hover\:\!bg-\[\#dbeafe\]:hover { background-color: color-mix(in srgb, #1d7ff0 20%, var(--color-card)) !important; }
+:root[data-mode="auto"] .hover\:\!bg-\[\#ffe3e9\]:hover { background-color: color-mix(in srgb, #ec2f55 17%, var(--color-card)) !important; }
+:root[data-mode="auto"] .hover\:\!text-\[\#15539c\]:hover { color: #8fc4ff !important; }
+:root[data-mode="auto"] .hover\:\!text-\[\#a4123a\]:hover { color: #ff93a6 !important; }
+:root[data-mode="auto"] .hover\:\!text-\[\#d41f45\]:hover { color: #ff93a6 !important; }
+}
