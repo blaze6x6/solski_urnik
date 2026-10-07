@@ -1,7 +1,8 @@
 "use client";
 
-import { ShieldCheck, Trash2, Users } from "lucide-react";
-import { superDeleteUserAction } from "@/app/actions/users";
+import { useActionState, useState } from "react";
+import { Check, Copy, KeyRound, ShieldCheck, Trash2, Users } from "lucide-react";
+import { superDeleteUserAction, superResetPasswordAction, type TempPasswordState } from "@/app/actions/users";
 import type { HouseholdOverview } from "@/lib/data";
 import { DOGODEK, OTROK, UPORABNIK, count } from "@/lib/plural";
 
@@ -30,6 +31,56 @@ function DeleteButton({
   );
 }
 
+function ResetPasswordButton({ id, name }: { id: number; name: string }) {
+  const [state, formAction, pending] = useActionState<TempPasswordState, FormData>(superResetPasswordAction, undefined);
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <form
+        action={formAction}
+        onSubmit={(e) => {
+          if (!window.confirm(`Ustvarim novo začasno geslo za ${name}? Staro geslo preneha veljati, uporabnik bo odjavljen z vseh naprav.`)) {
+            e.preventDefault();
+          }
+        }}
+      >
+        <input type="hidden" name="id" value={id} />
+        <button className="btn btn-ghost !px-3 !py-1.5 text-xs" disabled={pending}>
+          <KeyRound className="h-3.5 w-3.5" strokeWidth={2.4} />
+          {pending ? "Ustvarjam …" : "Ponastavi geslo"}
+        </button>
+      </form>
+      {state?.error ? <p className="text-xs font-medium text-[#a4123a]">{state.error}</p> : null}
+      {state?.password ? (
+        <div className="w-full rounded-xl border border-[#cfe0c8] bg-[#eef5ea] px-3 py-2 text-xs text-[#3c5f2a]">
+          <p className="font-semibold">Novo začasno geslo za {state.name} (prikazano samo enkrat):</p>
+          <div className="mt-1 flex items-center gap-2">
+            <code className="rounded-md bg-white px-2 py-1 font-mono text-sm font-bold tracking-wider text-ink select-all">
+              {state.password}
+            </code>
+            <button
+              type="button"
+              className="icon-btn !h-7 !w-7"
+              title="Kopiraj"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(state.password!);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                } catch {}
+              }}
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-[#4f6e3c]">Sporočite ga uporabniku; po prijavi naj ga zamenja v Nastavitvah.</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SuperadminPanel({
   households,
   selfId,
@@ -47,7 +98,8 @@ export function SuperadminPanel({
         <p className="mt-1 max-w-2xl text-sm text-ink-soft">
           Pregled vseh ločenih računov (skupin). Tu lahko odstranite katerega koli drugega
           administratorja ali uporabnika. Odstranitev lastnika skupine izbriše tudi vse
-          člane skupine, otroke, urnike, predmete in dogodke.
+          člane skupine, otroke, urnike, predmete in dogodke. Gesel ni mogoče prebrati
+          (v bazi so shranjena samo zgoščena), lahko pa uporabniku ustvarite novo začasno geslo.
         </p>
       </div>
 
@@ -89,6 +141,7 @@ export function SuperadminPanel({
                       </p>
                       <p className="truncate text-xs text-ink-faint">{p.email}</p>
                     </div>
+                    {isSelf ? null : <ResetPasswordButton id={p.id} name={p.name} />}
                     {blocked ? null : (
                       <DeleteButton
                         id={p.id}
