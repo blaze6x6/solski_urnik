@@ -192,7 +192,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           {kidData.map(({ kid, lessons, busTo, busFrom, eventsToday }) => (
             <TodayCard
               key={kid.id}
