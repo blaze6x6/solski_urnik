@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomInt } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { events, notifications, userEmails, users } from "@/db/schema";
+import { events, notifications, sessions, userEmails, users } from "@/db/schema";
 import { hashPassword, householdUsers, requireSuperadmin, requireUser } from "@/lib/auth";
 import { notifyScope } from "@/lib/notifications";
 
@@ -210,4 +211,37 @@ export async function superDeleteUserAction(formData: FormData): Promise<void> {
   // otroci, predmeti, leta, seje in dodatni e-poštni naslovi se izbrišejo s kaskado
   await db.delete(users).where(eq(users.id, target.id));
   refresh();
+}
+
+export type TempPasswordState = { error?: string; password?: string; name?: string } | undefined;
+
+// brez znakov, ki se zamenjujejo (0/O, 1/l/I)
+const TEMP_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateTempPassword(len = 10): string {
+  let out = "";
+  for (let i = 0; i < len; i++) out += TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)];
+  return out;
+}
+
+/**
+ * Superadministrator ponastavi geslo katerega koli uporabnika. Obstoječih gesel ni mogoče
+ * prebrati (v bazi je samo zgoščena vrednost), zato se ustvari novo začasno geslo,
+ * ki se prikaže enkrat. Uporabnik je odjavljen z vseh naprav.
+ */
+export async function superResetPasswordAction(
+  _prev: TempPasswordState,
+  formData: FormData,
+): Promise<TempPasswordState> {
+  await requireSuperadmin();
+  const id = Number(formData.get("id") ?? 0);
+  if (!id) return { error: "Uporabnik ni najden." };
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  const target = rows[0];
+  if (!target) return { error: "Uporabnik ni najden." };
+
+  const password = generateTempPassword();
+  await db.update(users).set({ passwordHash: hashPassword(password) }).where(eq(users.id, id));
+  await db.delete(sessions).where(eq(sessions.userId, id));
+  return { password, name: target.name };
 }
