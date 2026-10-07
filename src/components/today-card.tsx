@@ -94,7 +94,7 @@ export function TodayCard({
     .toUpperCase();
 
   return (
-    <section className="card flex flex-col overflow-hidden">
+    <section className="card flex min-w-0 flex-col overflow-hidden">
       {/* Glava */}
       <div className="flex items-center gap-3 border-b border-line px-5 py-4">
         <ChildDetailsTrigger
@@ -126,9 +126,9 @@ export function TodayCard({
         </Link>
       </div>
 
-      <div className="grid flex-1 gap-0 lg:grid-cols-[1.25fr_1fr]">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         {/* Današnji pouk */}
-        <div className="border-b border-line px-5 py-4 lg:border-r lg:border-b-0">
+        <div className="min-w-0 border-b border-line px-5 py-4 lg:border-r lg:border-b-0">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
               Danes · {dateLabel}
@@ -209,7 +209,7 @@ export function TodayCard({
                       {l.end}
                     </span>
                     <span className="h-8 w-[3px] shrink-0 rounded-full" style={{ background: accent }} />
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 overflow-hidden">
                       {l.name ? (
                         <span
                           className={cn(
@@ -225,19 +225,19 @@ export function TodayCard({
                       {l.events.map((e, i) => {
                         const pe = eventColor(e.color);
                         return e.cancelled ? (
-                          <span key={i} className="mt-0.5 flex flex-wrap items-center gap-1">
-                            <span className="inline-flex max-w-full items-center rounded-full bg-[#c9cfd6] px-2 py-[1px] text-[10.5px] font-bold text-[#6b7480] line-through">
-                              <span className="truncate">{e.title}</span>
+                          <span key={i} className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+                            <span className="inline-flex min-w-0 max-w-full items-center rounded-full bg-[#c9cfd6] px-2 py-[1px] text-[10.5px] font-bold text-[#6b7480] line-through">
+                              <span className="min-w-0 truncate" title={e.title}>{e.title}</span>
                             </span>
                             <span className="text-[10px] font-bold tracking-wide text-[#8a939e] uppercase">Odpade</span>
                           </span>
                         ) : (
-                          <span key={i} className="mt-0.5 flex flex-wrap items-center gap-1">
+                          <span key={i} className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
                             <span
-                              className="inline-flex max-w-full items-center rounded-full px-2 py-[1px] text-[10.5px] font-bold text-white"
+                              className="inline-flex min-w-0 max-w-full items-center rounded-full px-2 py-[1px] text-[10.5px] font-bold text-white"
                               style={{ background: pe.solid }}
                             >
-                              <span className="truncate">{e.title}</span>
+                              <span className="min-w-0 truncate" title={e.title}>{e.title}</span>
                             </span>
                             {e.time ? <span className="text-[10px] text-ink-faint">{e.time}</span> : null}
                           </span>
@@ -257,7 +257,7 @@ export function TodayCard({
         </div>
 
         {/* Avtobus + dogodki */}
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <div className="border-b border-line px-5 py-4">
             <p className="mb-3 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
               <BusFront className="h-3.5 w-3.5" strokeWidth={2.4} />
