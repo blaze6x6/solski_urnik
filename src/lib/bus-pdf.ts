@@ -13,7 +13,7 @@ export type BusPdfPayload = {
   subtitle?: string;
   note?: string;
   /** »bw« = črno-bel za tisk (privzeto), »color« = barvni */
-  style?: "bw" | "color";
+  style?: "bw" | "color" | "app";
 } & TimetableData;
 
 function safeFileName(s: string): string {
@@ -28,6 +28,10 @@ function safeFileName(s: string): string {
 }
 
 export async function exportBusTimetablePdf(p: BusPdfPayload): Promise<void> {
+  if (p.style === "app") {
+    const { exportBusTimetableAppPdf } = await import("@/lib/bus-pdf-app");
+    return exportBusTimetableAppPdf(p);
+  }
   const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const autoTable = autoTableMod.default;
 
