@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Samodejne dnevne varnostne kopije baze (pg_dump) v ./backups
+  # Hrani: 7 dnevnih, 4 tedenske in 6 mesečnih kopij.
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: app_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_EXTRA_OPTS: "--clean --if-exists"
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+      HEALTHCHECK_PORT: 8080
+      TZ: Europe/Ljubljana
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
+      TZ: Europe/Ljubljana
+      # Privzeti administrator ob prvem zagonu (ustvari se samo, če je baza prazna)
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@urnik.si}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-urnik123}
+      # E-poštni povzetki (neobvezno — brez tega je pošiljanje onemogočeno)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ENABLE_DIGEST: ${ENABLE_DIGEST:-0}
+      DIGEST_TIME: ${DIGEST_TIME:-06:30}
+      ENABLE_REMINDERS: ${ENABLE_REMINDERS:-1}
+      REMINDER_INTERVAL_MIN: ${REMINDER_INTERVAL_MIN:-5}
+      CRON_SECRET: ${CRON_SECRET:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  db_data:
