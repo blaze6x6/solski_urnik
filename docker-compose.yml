@@ -66,6 +66,7 @@ services:
       ENABLE_REMINDERS: ${ENABLE_REMINDERS:-1}
       REMINDER_INTERVAL_MIN: ${REMINDER_INTERVAL_MIN:-5}
       CRON_SECRET: ${CRON_SECRET:-}
+      APP_URL: ${APP_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
