@@ -141,6 +141,17 @@ export const busRoutes = pgTable("bus_routes", {
  * Stalni vozni red (postaje × vožnje) za tisk ali izvoz v PDF. Ni vezan na
  * posameznega otroka — velja za skupino (gospodinjstvo).
  */
+/** Žetoni za ponastavitev pozabljenega gesla (shranjen je samo zgoščen žeton, veljajo 1 uro). */
+export const passwordResets = pgTable("password_resets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const busTimetables = pgTable("bus_timetables", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
