@@ -45,8 +45,8 @@ export type PdfPayload = {
   slots: PdfSlot[];
   cells: Record<string, PdfCell>;
   mode: "full" | "abbr";
-  /** »bw« = črno-bel za tisk (privzeto), »color« = barvni kot v aplikaciji */
-  style?: "bw" | "color";
+  /** »bw« = črno-bel za tisk (privzeto), »color« = barvni, »app« = natančno kot v aplikaciji */
+  style?: "bw" | "color" | "app";
   /** legenda kratic — izpiše se le, če je vklopljen prikaz s kraticami */
   legend?: string[];
   /** ime datoteke brez končnice */
@@ -253,6 +253,10 @@ function buildDoc(
 }
 
 export async function exportTimetablePdf(payload: PdfPayload): Promise<void> {
+  if (payload.style === "app") {
+    const { exportTimetableAppPdf } = await import("@/lib/pdf-app");
+    return exportTimetableAppPdf(payload);
+  }
   const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const autoTable = autoTableMod.default;
 
