@@ -106,6 +106,17 @@ V nastavitvah (zavihek E-pošta) je tudi tipka »Pošlji povzetek zdaj« za test
 
 Next.js (App Router) · PostgreSQL + Drizzle ORM · Tailwind CSS · jsPDF · Nodemailer · Lucide ikone.
 
+## Gesla
+
+Gesla so v bazi shranjena samo kot zgoščena vrednost (scrypt), zato jih nihče, tudi superadministrator, ne more prebrati.
+
+- **Pozabljeno geslo:** na prijavi »Pozabljeno geslo?« pošlje povezavo (velja 1 uro) na e-pošto računa. Potrebuje nastavljen SMTP; za pravilne povezave nastavite še `APP_URL` (npr. `https://urnik.tekavec.net`).
+- **Superadministrator:** Nastavitve → Superadmin → »Ponastavi geslo« ustvari novo začasno geslo (prikazano enkrat) in uporabnika odjavi z vseh naprav.
+
+## PDF izvoz
+
+Urnik in vozni red se izvozita v treh slogih: »Črno-bel« (za tisk), »Barvni« in »Kot v aplikaciji« (zaobljene celice, pilule dogodkov, ikone, barve izbrane teme; nad urnikom samo ime otroka).
+
 ## Varnostne kopije baze
 
 V `docker-compose.yml` je vsebnik `backup`, ki vsak dan naredi `pg_dump` baze v mapo `./backups`
