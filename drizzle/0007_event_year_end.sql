@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "ignore_year_end" boolean DEFAULT false NOT NULL;
