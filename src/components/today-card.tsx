@@ -126,9 +126,9 @@ export function TodayCard({
         </Link>
       </div>
 
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         {/* Današnji pouk */}
-        <div className="min-w-0 border-b border-line px-5 py-4 lg:border-r lg:border-b-0">
+        <div className="min-w-0 border-b border-line px-5 py-4 2xl:border-r 2xl:border-b-0">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
               Danes · {dateLabel}
