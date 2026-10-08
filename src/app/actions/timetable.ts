@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { subjects, timeSlots, timetableEntries } from "@/db/schema";
+import { lessonCancellations, subjects, timeSlots, timetableEntries } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getOwnedChild } from "@/lib/data";
 import { notifyScope } from "@/lib/notifications";
-import { DNEVI } from "@/lib/time";
+import { DNEVI, formatDayMonthSI } from "@/lib/time";
 import { slotTitle } from "@/lib/week";
 
 /** Nastavi ali počisti predmet v celici urnika. */
@@ -80,6 +80,52 @@ export async function setEntryAction(input: {
     "timetable",
     subjectName ? "updated" : "deleted",
     subjectName ? `Urnik (${where}): ${subjectName}` : `Urnik (${where}): predmet odstranjen`,
+  );
+  revalidatePath("/", "layout");
+}
+
+/** Označi, da ura (predmet) na določen datum odpade — ali to prekliče. */
+export async function setLessonCancelledAction(input: {
+  childId: number;
+  slotId: number;
+  /** datum (YYYY-MM-DD) */
+  date: string;
+  cancelled: boolean;
+}): Promise<void> {
+  const user = await requireUser();
+  const date = String(input.date ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const child = await getOwnedChild(user.scope, Number(input.childId));
+  if (!child) return;
+  const slot = await db
+    .select()
+    .from(timeSlots)
+    .where(and(eq(timeSlots.id, Number(input.slotId)), eq(timeSlots.childId, child.id)))
+    .limit(1);
+  if (!slot[0]) return;
+
+  if (input.cancelled) {
+    await db
+      .insert(lessonCancellations)
+      .values({ childId: child.id, slotId: slot[0].id, date })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(lessonCancellations)
+      .where(
+        and(
+          eq(lessonCancellations.childId, child.id),
+          eq(lessonCancellations.slotId, slot[0].id),
+          eq(lessonCancellations.date, date),
+        ),
+      );
+  }
+  const where = `${child.name}, ${formatDayMonthSI(date)} · ${slotTitle(slot[0])}`;
+  await notifyScope(
+    user,
+    "timetable",
+    "updated",
+    input.cancelled ? `Ura odpade (${where})` : `Ura je spet na sporedu (${where})`,
   );
   revalidatePath("/", "layout");
 }
