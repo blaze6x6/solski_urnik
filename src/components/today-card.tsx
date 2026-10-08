@@ -8,9 +8,12 @@ import {
   CalendarDays,
   CircleDot,
   Coffee,
+  Check,
   Flag,
+  NotebookPen,
   Palmtree,
 } from "lucide-react";
+import { toggleNoteDoneAction } from "@/app/actions/notes";
 import { cn, eventColor, subjectColor } from "@/lib/colors";
 import { findNowSlot, toMinutes } from "@/lib/time";
 import { ChildDetailsTrigger, type ChildDetails } from "@/components/child-details-modal";
@@ -42,6 +45,16 @@ export type DayEventItem = {
   cancelled: boolean;
 };
 
+export type NoteItem = {
+  id: number;
+  title: string;
+  dueLabel: string | null;
+  dueText: string | null;
+  /** rok je znotraj opozorilnega okna ali že mimo */
+  urgent: boolean;
+  overdue: boolean;
+};
+
 type Props = {
   child: ChildDetails;
   dateLabel: string;
@@ -52,6 +65,7 @@ type Props = {
   busTo: BusItem[];
   busFrom: BusItem[];
   eventsToday: DayEventItem[];
+  notes?: NoteItem[];
 };
 
 export function TodayCard({
@@ -64,6 +78,7 @@ export function TodayCard({
   busTo,
   busFrom,
   eventsToday,
+  notes = [],
 }: Props) {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -127,6 +142,8 @@ export function TodayCard({
           <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} />
         </Link>
       </div>
+
+      <NotesStrip childId={child.id} notes={notes} />
 
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         {/* Današnji pouk */}
@@ -342,5 +359,73 @@ export function TodayCard({
         </div>
       </div>
     </section>
+  );
+}
+
+
+/** Odprte beležke otroka nad današnjim urnikom: nujne (rok se bliža) so vedno vidne, ostale so zložene. */
+function NotesStrip({ childId, notes }: { childId: number; notes: NoteItem[] }) {
+  if (notes.length === 0) return null;
+  const urgent = notes.filter((n) => n.urgent);
+  const rest = notes.filter((n) => !n.urgent);
+
+  const row = (n: NoteItem) => (
+    <li
+      key={n.id}
+      className={cn(
+        "flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2",
+        n.overdue
+          ? "border-[#f3b9c6] bg-[#fff0f3]"
+          : n.urgent
+            ? "border-amber/50 bg-amber-soft/60"
+            : "border-line/70 bg-white",
+      )}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold" title={n.title}>
+          {n.title}
+        </span>
+        {n.dueLabel ? (
+          <span
+            className={cn(
+              "block text-[11px] font-semibold tabular-nums",
+              n.overdue ? "text-[#c21742]" : n.urgent ? "text-[#b35a00]" : "text-ink-faint",
+            )}
+          >
+            Rok {n.dueLabel} · {n.dueText}
+          </span>
+        ) : null}
+      </span>
+      <form action={toggleNoteDoneAction} className="shrink-0">
+        <input type="hidden" name="id" value={n.id} />
+        <input type="hidden" name="childId" value={childId} />
+        <button className="btn btn-ghost no-print !gap-1 !px-2.5 !py-1 text-[11px]" title="Označi kot opravljeno">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.8} />
+          Opravljeno
+        </button>
+      </form>
+    </li>
+  );
+
+  return (
+    <div className="min-w-0 border-b border-line px-5 py-3">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
+        <NotebookPen className="h-3.5 w-3.5" strokeWidth={2.4} />
+        Beležke
+        <span className="rounded-full bg-paper-deep px-1.5 py-px text-[10px] text-ink-soft">{notes.length}</span>
+        <Link href={`/belezke?otrok=${childId}`} className="ml-auto text-[11px] font-semibold tracking-normal text-spruce normal-case hover:underline">
+          Vse
+        </Link>
+      </p>
+      {urgent.length > 0 ? <ul className="space-y-1.5">{urgent.map(row)}</ul> : null}
+      {rest.length > 0 ? (
+        <details className={cn(urgent.length > 0 && "mt-2")} open={urgent.length === 0 && rest.length <= 2}>
+          <summary className="cursor-pointer text-[12px] font-semibold text-ink-soft select-none">
+            {urgent.length > 0 ? `Še ${rest.length} drugih` : `Prikaži ${rest.length === 1 ? "beležko" : "beležke"}`}
+          </summary>
+          <ul className="mt-1.5 space-y-1.5">{rest.slice(0, 8).map(row)}</ul>
+        </details>
+      ) : null}
+    </div>
   );
 }
