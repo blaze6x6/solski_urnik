@@ -66,7 +66,7 @@ export function BusForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <div>
           <label className="label" htmlFor="time">
             Odhod
