@@ -7,7 +7,9 @@ import {
   getBusRoutes,
   getChildren,
   getSlots,
+  getCancelledLessons,
   getTimetableRows,
+  lessonKey,
   occurrencesInWindow,
 } from "@/lib/data";
 import { holidayMapForRange } from "@/lib/holidays";
@@ -79,10 +81,11 @@ export default async function DashboardPage() {
 
   const kidData = await Promise.all(
     kids.map(async (kid) => {
-      const [slots, rows, bus] = await Promise.all([
+      const [slots, rows, bus, cancelledLessons] = await Promise.all([
         getSlots(kid.id),
         getTimetableRows(kid.id),
         getBusRoutes(kid.id),
+        getCancelledLessons(kid.id, today, today),
       ]);
 
       const kidOccs = allOccurrences.filter(
@@ -113,6 +116,7 @@ export default async function DashboardPage() {
             name: subject?.name ?? null,
             abbr: subject?.abbr ?? null,
             colorIdx: subject?.colorIdx ?? null,
+            cancelled: subject !== null && cancelledLessons.has(lessonKey(slot.id, today)),
             events: hits.map((h) => ({
               title: h.event.title,
               color: h.event.color,
