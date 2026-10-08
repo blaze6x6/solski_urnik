@@ -25,6 +25,8 @@ export type LessonItem = {
   name: string | null;
   abbr: string | null;
   colorIdx: number | null;
+  /** ura (predmet) danes odpade */
+  cancelled?: boolean;
   /** vsi dogodki, ki prekrivajo to uro */
   events: Array<{ title: string; color: string; time: string; cancelled: boolean }>;
 };
@@ -169,7 +171,7 @@ export function TodayCard({
             <ul className="space-y-1.5">
               {lessons.map((l) => {
                 const pal = l.colorIdx !== null ? subjectColor(l.colorIdx) : null;
-                const isActive = nowSlot?.kind === "active" && nowSlot.slotId === l.slotId;
+                const isActive = nowSlot?.kind === "active" && nowSlot.slotId === l.slotId && !l.cancelled;
                 const past = nowMin !== null && toMinutes(l.end) <= nowMin;
                 const activeEv = l.events.filter((e) => !e.cancelled);
                 const evPal = activeEv[0] ? eventColor(activeEv[0].color) : null;
@@ -214,13 +216,16 @@ export function TodayCard({
                         <span
                           className={cn(
                             "block truncate",
-                            activeEv.length > 0
+                            activeEv.length > 0 || l.cancelled
                               ? "text-[12.5px] font-medium text-ink-faint line-through"
                               : "text-[13px] font-semibold",
                           )}
                         >
                           {l.name}
                         </span>
+                      ) : null}
+                      {l.name && l.cancelled && activeEv.length === 0 ? (
+                        <span className="text-[10px] font-bold tracking-wide text-[#8a939e] uppercase">Odpade</span>
                       ) : null}
                       {l.events.map((e, i) => {
                         const pe = eventColor(e.color);
