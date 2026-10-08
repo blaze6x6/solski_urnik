@@ -200,6 +200,15 @@ export async function getNotes(childId: number) {
     .orderBy(desc(notes.pinned), desc(notes.noteDate), desc(notes.id));
 }
 
+/** Odprte (neopravljene) beležke otroka — za pregled. */
+export async function getOpenNotes(childId: number) {
+  return db
+    .select()
+    .from(notes)
+    .where(and(eq(notes.childId, childId), eq(notes.done, false)))
+    .orderBy(asc(sql`${notes.dueDate} nulls last`), desc(notes.pinned), desc(notes.id));
+}
+
 export async function getGrades(childId: number) {
   return db
     .select({ grade: grades, subject: subjects })
