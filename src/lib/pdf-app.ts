@@ -257,7 +257,8 @@ function drawCellBox(
   const hasActive = active.length > 0;
   const subj = cell.hasSubject ? subjectColor(cell.colorIdx) : null;
   const evPal = hasActive ? eventColor(active[0].color ?? "amber") : null;
-  const bg: RGB = hasActive ? hexToRgb(evPal!.soft) : subj ? hexToRgb(subj.soft) : [236, 239, 242];
+  const lessonOff = Boolean(cell.hasSubject && cell.subjectCancelled && !hasActive);
+  const bg: RGB = hasActive ? hexToRgb(evPal!.soft) : lessonOff ? [236, 239, 242] : subj ? hexToRgb(subj.soft) : [236, 239, 242];
 
   fill(doc, bg);
   doc.roundedRect(ix, iy, iw, ih, 1.8, 1.8, "F");
@@ -279,7 +280,7 @@ function drawCellBox(
     const r = fitText(doc, subjText, iw - 1.6, hasActive ? 1 : 2, base, 5);
     subjLines = r.lines;
     subjSize = r.size;
-    subjH = subjLines.length * subjSize * PT * 1.15 + (events.length ? 0.8 : 0);
+    subjH = subjLines.length * subjSize * PT * 1.15 + (events.length ? 0.8 : 0) + (lessonOff ? 2.6 : 0);
   }
 
   // koliko dogodkov gre v celico
@@ -298,17 +299,22 @@ function drawCellBox(
     doc.setFont("DejaVu", "bold");
     doc.setFontSize(subjSize);
     const lh = subjSize * PT * 1.15;
-    const col = hasActive ? T.inkFaint : subj ? hexToRgb(subj.ink) : T.ink;
+    const col: RGB = hasActive || lessonOff ? T.inkFaint : subj ? hexToRgb(subj.ink) : T.ink;
     ink(doc, col);
     subjLines.forEach((l, i) => {
       const ty = cy + lh * (i + 0.5);
       doc.text(l, ix + iw / 2, ty, { align: "center", baseline: "middle" });
-      if (hasActive) {
+      if (hasActive || lessonOff) {
         const tw = doc.getTextWidth(l);
         stroke(doc, col, 0.2);
         doc.line(ix + iw / 2 - tw / 2, ty, ix + iw / 2 + tw / 2, ty);
       }
     });
+    if (lessonOff) {
+      doc.setFontSize(5.4);
+      ink(doc, [138, 147, 158]);
+      doc.text("ODPADE", ix + iw / 2, cy + lh * subjLines.length + 1.3, { align: "center", baseline: "middle" });
+    }
     cy += subjH;
   }
 
