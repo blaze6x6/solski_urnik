@@ -8,12 +8,14 @@ import {
   getChildren,
   getSlots,
   getCancelledLessons,
+  getOpenNotes,
   getTimetableRows,
   lessonKey,
   occurrencesInWindow,
 } from "@/lib/data";
-import { addDaysISO, DNEVI, formatDateSI, formatDateTimeSI, todayISO, weekdayIndex } from "@/lib/time";
+import { addDaysISO, DNEVI, formatDateSI, formatDateTimeSI, formatShortSI, todayISO, weekdayIndex } from "@/lib/time";
 import { escHtml } from "@/lib/text";
+import { dueText, isDueSoon } from "@/lib/notes";
 import { recipientsFor } from "@/lib/recipients";
 import { eventsForSlot, timeLabel } from "@/lib/recurrence";
 import { slotTitle } from "@/lib/week";
@@ -149,6 +151,15 @@ export async function buildDigestHtmlForUser(user: User): Promise<string | null>
             )
             .join("<br>")
         : "—";
+    const dueNotes = (await getOpenNotes(kid.id)).filter((n) => isDueSoon(n, target));
+    if (dueNotes.length > 0) {
+      body += `<p style="background:#fff0da;border-left:4px solid #f58316;padding:8px 12px;border-radius:8px;font-size:13px;margin:10px 0"><strong>Beležke z rokom:</strong><br>${dueNotes
+        .map(
+          (n) =>
+            `${escHtml(n.title)} <span style="color:#9a5e04">(rok ${formatShortSI(n.dueDate!)} · ${escHtml(dueText(n.dueDate!, target))})</span>`,
+        )
+        .join("<br>")}</p>`;
+    }
     body += `<p style="font-size:13px;color:#374151;margin:10px 0"><strong>Avtobus v šolo:</strong> ${fmtBus(busTo)}<br><strong>Avtobus iz šole:</strong> ${fmtBus(busFrom)}</p>`;
   }
 
