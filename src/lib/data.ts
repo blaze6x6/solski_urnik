@@ -8,6 +8,7 @@ import {
   eventReminders,
   events,
   grades,
+  lessonCancellations,
   notes,
   schoolBreaks,
   schoolYears,
@@ -70,6 +71,25 @@ export async function getTimetableRows(childId: number) {
     .innerJoin(subjects, eq(subjects.id, timetableEntries.subjectId))
     .where(eq(timetableEntries.childId, childId))
     .orderBy(asc(timetableEntries.weekday));
+}
+
+/** Odpadle ure otroka v obdobju: ključ `slotId|datum`. */
+export async function getCancelledLessons(childId: number, start: string, end: string): Promise<Set<string>> {
+  const rows = await db
+    .select()
+    .from(lessonCancellations)
+    .where(
+      and(
+        eq(lessonCancellations.childId, childId),
+        gte(lessonCancellations.date, start),
+        lte(lessonCancellations.date, end),
+      ),
+    );
+  return new Set(rows.map((r) => lessonKey(r.slotId, r.date)));
+}
+
+export function lessonKey(slotId: number, date: string): string {
+  return `${slotId}|${date}`;
 }
 
 export async function getBusRoutes(childId: number) {
