@@ -374,6 +374,15 @@ export const notes = pgTable("notes", {
   content: text("content").notNull().default(""),
   noteDate: date("note_date", { mode: "string" }).notNull(),
   pinned: boolean("pinned").notNull().default(false),
+  /** neobvezen rok (npr. do kdaj je treba vrniti knjige) */
+  dueDate: date("due_date", { mode: "string" }),
+  /** koliko dni pred rokom se beležka pokaže na pregledu in pošlje opomnik */
+  remindDays: integer("remind_days").notNull().default(3),
+  /** opravljeno — beležka se ne prikazuje več na pregledu in ne sproži opomnika */
+  done: boolean("done").notNull().default(false),
+  doneAt: timestamp("done_at"),
+  /** rok, za katerega je bil opomnik že poslan (sprememba roka sproži nov opomnik) */
+  reminderSentFor: date("reminder_sent_for", { mode: "string" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
