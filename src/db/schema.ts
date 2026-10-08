@@ -249,6 +249,27 @@ export const eventCancellations = pgTable(
   (t) => [uniqueIndex("event_cancel_once").on(t.eventId, t.occurrenceDate)],
 );
 
+/**
+ * Odpadle ure pouka (npr. učitelj je odsoten): predmet ostane v urniku,
+ * ta konkretni datum pa je prečrtan in označen z »Odpade«.
+ */
+export const lessonCancellations = pgTable(
+  "lesson_cancellations",
+  {
+    id: serial("id").primaryKey(),
+    childId: integer("child_id")
+      .notNull()
+      .references(() => children.id, { onDelete: "cascade" }),
+    slotId: integer("slot_id")
+      .notNull()
+      .references(() => timeSlots.id, { onDelete: "cascade" }),
+    /** datum, na katerega ura odpade */
+    date: date("date", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("lesson_cancel_once").on(t.childId, t.slotId, t.date)],
+);
+
 /** E-poštni opomniki pred dogodkom (lahko jih je več na dogodek). */
 export const eventReminders = pgTable("event_reminders", {
   id: serial("id").primaryKey(),
