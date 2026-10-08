@@ -99,6 +99,13 @@
       "when": 1791211082067,
       "tag": "0013_password_resets",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791297482067,
+      "tag": "0014_lesson_cancellations",
+      "breakpoints": true
     }
   ]
 }
