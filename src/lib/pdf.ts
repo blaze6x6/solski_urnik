@@ -32,6 +32,8 @@ export type PdfDay = {
 
 export type PdfCell = {
   hasSubject: boolean;
+  /** ura (predmet) ta dan odpade */
+  subjectCancelled?: boolean;
   text: string;
   colorIdx: number;
   /** vsi dogodki v tej celici */
@@ -127,7 +129,7 @@ function buildDoc(
         row.push(off && s.id === firstLessonId ? off : "");
       } else {
         const lines: string[] = [];
-        if (cell.hasSubject) lines.push(cell.text);
+        if (cell.hasSubject) lines.push(cell.subjectCancelled ? `${cell.text} (odpade)` : cell.text);
         for (const e of cell.events ?? []) {
           lines.push(`${cell.hasSubject && !e.cancelled ? "▸ " : ""}${e.title}${e.cancelled ? " (odpade)" : ""}`);
           if (e.clock) lines.push(e.clock);
@@ -212,6 +214,10 @@ function buildDoc(
         const pal = subjectColor(cell.colorIdx);
         data.cell.styles.fillColor = hexToRgb(pal.soft);
         data.cell.styles.textColor = color ? hexToRgb(pal.ink) : [0, 0, 0];
+        if (cell.subjectCancelled && !hasActive) {
+          data.cell.styles.fillColor = [236, 239, 242];
+          data.cell.styles.textColor = [130, 138, 148];
+        }
       }
       if (events.length > 0) {
         if (hasActive) {
