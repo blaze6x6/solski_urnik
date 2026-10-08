@@ -8,6 +8,7 @@ import {
   getChildren,
   getSlots,
   getCancelledLessons,
+  getOpenNotes,
   getTimetableRows,
   lessonKey,
   occurrencesInWindow,
@@ -18,10 +19,12 @@ import {
   addDaysISO,
   dateInRange,
   formatDateSI,
+  formatShortSI,
   todayISO,
   weekdayIndex,
 } from "@/lib/time";
 import { eventsForSlot, timeLabel } from "@/lib/recurrence";
+import { dueText, isDueSoon } from "@/lib/notes";
 import { slotTitle } from "@/lib/week";
 import { TodayCard } from "@/components/today-card";
 import { DOGODEK, count } from "@/lib/plural";
@@ -81,11 +84,12 @@ export default async function DashboardPage() {
 
   const kidData = await Promise.all(
     kids.map(async (kid) => {
-      const [slots, rows, bus, cancelledLessons] = await Promise.all([
+      const [slots, rows, bus, cancelledLessons, openNotes] = await Promise.all([
         getSlots(kid.id),
         getTimetableRows(kid.id),
         getBusRoutes(kid.id),
         getCancelledLessons(kid.id, today, today),
+        getOpenNotes(kid.id),
       ]);
 
       const kidOccs = allOccurrences.filter(
@@ -146,7 +150,16 @@ export default async function DashboardPage() {
           cancelled: o.cancelled,
         }));
 
-      return { kid, lessons, busTo: busItems("to"), busFrom: busItems("from"), eventsToday };
+      const noteItems = openNotes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        dueLabel: n.dueDate ? formatShortSI(n.dueDate) : null,
+        dueText: n.dueDate ? dueText(n.dueDate, today) : null,
+        urgent: isDueSoon(n, today),
+        overdue: n.dueDate !== null && n.dueDate < today,
+      }));
+
+      return { kid, lessons, busTo: busItems("to"), busFrom: busItems("from"), eventsToday, noteItems };
     }),
   );
 
@@ -197,7 +210,7 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          {kidData.map(({ kid, lessons, busTo, busFrom, eventsToday }) => (
+          {kidData.map(({ kid, lessons, busTo, busFrom, eventsToday, noteItems }) => (
             <TodayCard
               key={kid.id}
               child={kid}
@@ -209,6 +222,7 @@ export default async function DashboardPage() {
               busTo={busTo}
               busFrom={busFrom}
               eventsToday={eventsToday}
+              notes={noteItems}
             />
           ))}
         </div>
