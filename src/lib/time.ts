@@ -106,6 +106,11 @@ export function formatDayMonthSI(iso: string): string {
   return `${d.getDate()}. ${MESECI[d.getMonth()]}`;
 }
 
+/** "7. 10. 2026 ob 14:05" (neodvisno od ICU/jezikovnih podatkov v okolju) */
+export function formatDateTimeSI(d: Date = new Date()): string {
+  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ob ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
 /** "februar 2026" */
 export function formatMonthSI(isoOrY: string | number, m?: number): string {
   let y: number, mo: number;
