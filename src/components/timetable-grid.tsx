@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { cn, eventColor, subjectColor } from "@/lib/colors";
 import { findNowSlot, toISO } from "@/lib/time";
-import { setEntryAction } from "@/app/actions/timetable";
+import { setEntryAction, setLessonCancelledAction } from "@/app/actions/timetable";
 import { setOccurrenceCancelledAction } from "@/app/actions/events";
 import { loadChildWeekAction } from "@/app/actions/week";
 import { PdfMenu, type PdfStyle } from "@/components/pdf-menu";
@@ -31,6 +31,8 @@ import { useIsMobile, useIsTouch, useSwipeNavigation } from "@/components/use-sw
 
 export type GridCell = {
   subject: { id: number; name: string; abbr: string; colorIdx: number } | null;
+  /** predmet ta dan odpade (ura je prečrtana) */
+  subjectCancelled: boolean;
   /** vsi dogodki, ki prekrivajo to celico (po času začetka) */
   events: GridEvent[];
 } | null;
@@ -265,6 +267,13 @@ export function TimetableGrid({
     });
   }
 
+  function toggleLessonCancelled(slotId: number, date: string, cancelled: boolean) {
+    startCancelTransition(async () => {
+      await setLessonCancelledAction({ childId, slotId, date, cancelled });
+      await refreshLocal();
+    });
+  }
+
   async function handlePdf(style: PdfStyle) {
     setExporting(true);
     try {
@@ -273,6 +282,7 @@ export function TimetableGrid({
         pdfCells[key] = cell
           ? {
               hasSubject: cell.subject !== null,
+              subjectCancelled: cell.subjectCancelled,
               text: cell.subject ? (mode === "full" ? cell.subject.name : cell.subject.abbr) : "",
               colorIdx: cell.subject?.colorIdx ?? 0,
               events: cell.events.map((e) => ({ title: e.title, clock: e.clock, cancelled: e.cancelled, color: e.color })),
@@ -281,7 +291,7 @@ export function TimetableGrid({
       }
       await exportTimetablePdf({
         title: studentName,
-        fileName: `urnik-${studentName}${style === "color" ? "-barvni" : ""}`,
+        fileName: `urnik-${studentName}${style === "color" ? "-barvni" : style === "app" ? "-aplikacija" : ""}`,
         days: days.map((d) => ({
           iso: d.iso,
           wd: d.wd,
@@ -598,6 +608,32 @@ export function TimetableGrid({
                           accent={subjectColor(detailCell.subject.colorIdx).solid}
                         />
                         <InfoRow label="Kratica" value={detailCell.subject.abbr} />
+                        {detailCell.subjectCancelled ? (
+                          <div className="rounded-2xl border border-line-strong bg-[#eceff2] p-3.5 text-[#6b7480]">
+                            <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase">
+                              <XCircle className="h-3.5 w-3.5" strokeWidth={2.6} />
+                              Ura odpade
+                            </p>
+                            <p className="mt-0.5 text-[15px] font-semibold line-through">{detailCell.subject.name}</p>
+                          </div>
+                        ) : null}
+                        {detailSlot.kind === "lesson" ? (
+                          <button
+                            disabled={cancelPending}
+                            onClick={() => toggleLessonCancelled(detailSlot.id, detailDay.iso, !detailCell.subjectCancelled)}
+                            className={cn("btn btn-ghost w-full", !detailCell.subjectCancelled && "!text-[#6b7480]")}
+                          >
+                            {detailCell.subjectCancelled ? (
+                              <Undo2 className="h-4 w-4" strokeWidth={2.4} />
+                            ) : (
+                              <XCircle className="h-4 w-4" strokeWidth={2.4} />
+                            )}
+                            {cancelPending ? "Shranjujem …" : detailCell.subjectCancelled ? "Povrni uro" : "Ura odpade"}
+                          </button>
+                        ) : null}
+                        <p className="text-center text-[11px] text-ink-faint">
+                          »Ura odpade« velja samo za {detailDay.dateLabel} — ostali tedni ostanejo nespremenjeni.
+                        </p>
                       </>
                     ) : detailSlot.kind === "lesson" && !(detailCell?.events.length) ? (
                       <p className="rounded-2xl border border-dashed border-line-strong bg-paper/70 p-4 text-center text-sm text-ink-faint">
@@ -741,7 +777,8 @@ function DetailHeader({
   const activeEvents = events.filter((e) => !e.cancelled);
   const evPal = eventColor((activeEvents[0] ?? events[0])?.color ?? "amber");
   const onlyEvent = cell !== null && cell.subject === null && events.length > 0;
-  const cancelledOnly = onlyEvent && activeEvents.length === 0;
+  const lessonCancelled = Boolean(cell?.subject && cell.subjectCancelled && activeEvents.length === 0);
+  const cancelledOnly = (onlyEvent && activeEvents.length === 0) || lessonCancelled;
 
   const gradient = cancelledOnly
     ? "linear-gradient(135deg, #9aa3ad 0%, #66707c 130%)"
@@ -876,7 +913,9 @@ function SlotRow(props: {
           ? cell.subject
             ? hasActive
               ? evPal!.soft
-              : pal!.soft
+              : cell.subjectCancelled
+                ? "#eceff2"
+                : pal!.soft
             : hasActive
               ? evPal!.soft
               : "#eceff2"
@@ -945,6 +984,20 @@ function SlotRow(props: {
                     {mode === "full" ? cell.subject.name : cell.subject.abbr}
                   </p>
                   <EventChips events={cell.events} small />
+                </div>
+              ) : cell.subject && cell.subjectCancelled ? (
+                /* ura odpade */
+                <div className="space-y-0.5">
+                  <p
+                    className={cn(
+                      "leading-tight font-bold text-[#8a939e] line-through",
+                      mode === "full" ? "text-[10px] sm:text-[12.5px] sm:font-semibold" : "text-[12px] sm:text-[13px]",
+                    )}
+                  >
+                    {mode === "full" ? cell.subject.name : cell.subject.abbr}
+                  </p>
+                  <p className="text-[8px] font-bold tracking-wide text-[#8a939e] uppercase sm:text-[9px]">Odpade</p>
+                  {cell.events.length > 0 ? <EventChips events={cell.events} small /> : null}
                 </div>
               ) : cell.subject ? (
                 /* predmet poteka normalno (dogodki so odpadli) */
