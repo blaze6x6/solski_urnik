@@ -206,7 +206,7 @@ export async function getOpenNotes(childId: number) {
     .select()
     .from(notes)
     .where(and(eq(notes.childId, childId), eq(notes.done, false)))
-    .orderBy(asc(sql`${notes.dueDate} nulls last`), desc(notes.pinned), desc(notes.id));
+    .orderBy(asc(sql`(${notes.dueDate} is null)`), asc(notes.dueDate), desc(notes.pinned), desc(notes.id));
 }
 
 export async function getGrades(childId: number) {
