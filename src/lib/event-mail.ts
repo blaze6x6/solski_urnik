@@ -27,7 +27,7 @@ import {
   isRecurring,
   timeLabel,
 } from "@/lib/recurrence";
-import { addDaysISO, formatDateSI, formatShortSI, todayISO } from "@/lib/time";
+import { addDaysISO, formatDateSI, formatDateTimeSI, formatShortSI, todayISO } from "@/lib/time";
 import { escHtml } from "@/lib/text";
 import { recipientsFor } from "@/lib/recipients";
 import { reminderLabel } from "@/lib/reminder-labels";
@@ -80,7 +80,7 @@ function card(title: string, rows: Array<[string, string]>, accent: string, intr
         ${footer ?? ""}
       </div>
       <div style="padding:14px 26px;background:#f4f6f8;color:#93a0b0;font-size:11px">
-        Zasebni šolski urnik · ${new Date().toLocaleString("sl-SI")}
+        Zasebni šolski urnik · ${formatDateTimeSI()}
       </div>
     </div></body></html>`;
 }
