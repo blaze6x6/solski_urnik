@@ -26,6 +26,7 @@ import {
 import type { NotificationItem } from "@/lib/notifications";
 import { cn } from "@/lib/colors";
 import { agoLabel } from "@/lib/plural";
+import { formatShortSI, toISO } from "@/lib/time";
 
 const SEEN_KEY = "urnik_obvestila_videna";
 
@@ -187,7 +188,7 @@ function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
   if (min < 7 * 24 * 60) return agoLabel(min);
-  return new Date(iso).toLocaleDateString("sl-SI", { day: "numeric", month: "numeric", year: "numeric" });
+  return formatShortSI(toISO(new Date(iso)));
 }
 
 export function NotificationsModal() {
