@@ -1,5 +1,5 @@
 import type { SchoolBreak } from "@/db/schema";
-import { getSlots, getTimetableRows, occurrencesInWindow } from "@/lib/data";
+import { getCancelledLessons, getSlots, getTimetableRows, lessonKey, occurrencesInWindow } from "@/lib/data";
 import { holidayMapForRange } from "@/lib/holidays";
 import { clockLabel, eventsForSlot, isRecurring, recurrenceLabel, timeLabel, type Occurrence } from "@/lib/recurrence";
 import {
@@ -59,10 +59,11 @@ export async function buildChildWeek(
   const end = dates[4];
   const today = todayISO();
 
-  const [rawSlots, rows, occs] = await Promise.all([
+  const [rawSlots, rows, occs, cancelledLessons] = await Promise.all([
     getSlots(childId),
     getTimetableRows(childId),
     occurrencesInWindow([childId], start, end, scopeId),
+    getCancelledLessons(childId, start, end),
   ]);
 
   const visibleSlots = rawSlots.filter((s) => s.showInTimetable);
@@ -120,6 +121,7 @@ export async function buildChildWeek(
       if (!subject && hits.length === 0) continue; // prazen termin
 
       cells[key] = {
+        subjectCancelled: subject !== null && cancelledLessons.has(lessonKey(slot.id, day.iso)),
         subject: subject
           ? { id: subject.id, name: subject.name, abbr: subject.abbr, colorIdx: subject.colorIdx }
           : null,
