@@ -7,10 +7,12 @@ import {
   getBusRoutes,
   getChildren,
   getSlots,
+  getCancelledLessons,
   getTimetableRows,
+  lessonKey,
   occurrencesInWindow,
 } from "@/lib/data";
-import { addDaysISO, DNEVI, formatDateSI, todayISO, weekdayIndex } from "@/lib/time";
+import { addDaysISO, DNEVI, formatDateSI, formatDateTimeSI, todayISO, weekdayIndex } from "@/lib/time";
 import { escHtml } from "@/lib/text";
 import { recipientsFor } from "@/lib/recipients";
 import { eventsForSlot, timeLabel } from "@/lib/recurrence";
@@ -71,10 +73,11 @@ export async function buildDigestHtmlForUser(user: User): Promise<string | null>
 
   let body = "";
   for (const kid of kids) {
-    const [slots, rows, bus] = await Promise.all([
+    const [slots, rows, bus, cancelledLessons] = await Promise.all([
       getSlots(kid.id),
       getTimetableRows(kid.id),
       getBusRoutes(kid.id),
+      getCancelledLessons(kid.id, target, target),
     ]);
     const subjectAt = new Map(
       afterYear ? [] : rows.filter((r) => r.entry.weekday === wd).map((r) => [r.entry.slotId, r.subject]),
@@ -91,7 +94,7 @@ export async function buildDigestHtmlForUser(user: User): Promise<string | null>
           (o) => o.event.childId === null || o.event.childId === kid.id,
         );
         if (!subject && hits.length === 0) return null;
-        return { slot, subject, hits };
+        return { slot, subject, hits, lessonOff: subject !== null && cancelledLessons.has(lessonKey(slot.id, target)) };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
@@ -124,7 +127,9 @@ export async function buildDigestHtmlForUser(user: User): Promise<string | null>
         )
         .join("<br>");
       const value =
-        x.hits.length === 0
+        x.lessonOff && active.length === 0
+          ? `<span style="color:#9ca3af"><s>${escHtml(x.subject!.name)}</s> (odpade)</span>${x.hits.length ? `<br>${evText}` : ""}`
+          : x.hits.length === 0
           ? escHtml(x.subject!.name)
           : x.subject
             ? active.length > 0
@@ -152,7 +157,7 @@ export async function buildDigestHtmlForUser(user: User): Promise<string | null>
       <h1 style="font-family:Georgia,serif;font-size:24px;margin:0;color:#1f4a38">Dnevni povzetek urnika</h1>
       <p style="color:#6b7280;font-size:13px;margin:6px 0 0">${formatDateSI(target)}</p>
       ${body}
-      <p style="font-size:12px;color:#9ca3af;margin-top:28px">Poslal Zasebni šolski urnik · ${new Date().toLocaleString("sl-SI")}</p>
+      <p style="font-size:12px;color:#9ca3af;margin-top:28px">Poslal Zasebni šolski urnik · ${formatDateTimeSI()}</p>
     </div></body></html>`;
 }
 
