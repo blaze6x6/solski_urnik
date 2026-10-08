@@ -97,7 +97,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
   const fromRoutes = routes.filter((r) => r.direction === "from");
 
   const Column = ({ title, list }: { title: string; list: typeof routes }) => (
-    <div className="card p-5">
+    <div className="card min-w-0 p-5">
       <h3 className="font-display mb-4 text-lg font-semibold">{title}</h3>
       {list.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line-strong bg-paper/60 px-4 py-6 text-center text-sm text-ink-faint">
@@ -185,10 +185,10 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr_360px]">
+      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px]">
         <Column title="V šolo" list={toRoutes} />
         <Column title="Iz šole" list={fromRoutes} />
-        <div className="xl:sticky xl:top-20">
+        <div className="min-w-0 md:col-span-2 2xl:sticky 2xl:top-20 2xl:col-span-1">
           <BusForm key={editing?.id ?? "nov"} childId={selected.id} route={editing} />
           {editing ? (
             <Link href={`/avtobus?otrok=${selected.id}`} className="btn btn-ghost mt-3 w-full">
