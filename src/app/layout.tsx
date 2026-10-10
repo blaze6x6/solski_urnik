@@ -40,7 +40,12 @@ export const metadata: Metadata = {
     title: "Urnik",
   },
   formatDetection: { telephone: false },
-  other: { "application-name": "Šolski urnik" },
+  other: {
+    "application-name": "Šolski urnik",
+    // iOS Safari: eksplicitno, da se aplikacija z domačega zaslona odpre brez brskalnika
+    "apple-mobile-web-app-capable": "yes",
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export async function generateViewport(): Promise<Viewport> {
