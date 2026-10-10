@@ -243,8 +243,10 @@ export function IosHelpSheet({ onClose }: { onClose: () => void }) {
         </ol>
 
         <p className="mx-5 mb-5 rounded-xl bg-paper px-4 py-3 text-[12px] leading-relaxed text-ink-soft">
-          Opomba: na iPhonu namestitev deluje samo v brskalniku <strong>Safari</strong> (ne v Chromu
-          ali Firefoxu).
+          Opomba: gumb <strong>Deli</strong> je pri Safariju na dnu zaslona. V Chromu in Edgu na iPhonu
+          (iOS 16.4 ali novejši) je v meniju za deljenje, pri starejših različicah pa namestitev deluje
+          samo v <strong>Safariju</strong>. Po namestitvi se morate v aplikaciji ponovno prijaviti
+          (iOS ima zanjo ločen prostor za piškotke).
         </p>
       </div>
     </div>
@@ -353,7 +355,7 @@ export function InstallPanel() {
             </p>
             <p className="mt-1.5 leading-relaxed text-ink-soft">
               Gumb <strong>Deli</strong> → <strong>Dodaj na domači zaslon</strong> →{" "}
-              <strong>Dodaj</strong>.
+              <strong>Dodaj</strong>. Po namestitvi se morate v aplikaciji enkrat prijaviti.
             </p>
           </div>
           <div>
