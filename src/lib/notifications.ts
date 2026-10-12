@@ -9,7 +9,7 @@
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationStates, notifications } from "@/db/schema";
-import { pushToScope } from "@/lib/push";
+import { currentDeviceId, pushToScope } from "@/lib/push";
 
 export type NotifKind =
   | "event"
@@ -66,11 +66,12 @@ export async function notifyScope(
         ),
       );
     // push obvestilo ostalim članom skupine (ne čaka na rezultat)
+    const ownDevice = await currentDeviceId();
     void pushToScope(
       actor.scope,
       "changes",
       { title: "Šolski urnik", body: `${actor.name}: ${text}`, url: PUSH_URL[kind] ?? "/", tag: `notif-${row.id}` },
-      actor.id,
+      ownDevice,
     );
   } catch (err) {
     console.error("[obvestila] zapis ni uspel:", err);
