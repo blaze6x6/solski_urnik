@@ -139,3 +139,16 @@ docker compose start app
 ```
 
 Kopije vsebujejo osebne podatke otrok — mapo zaščitite pred nepooblaščenim dostopom.
+
+## Push obvestila
+
+Vsak uporabnik jih vklopi sam na svoji napravi: **Nastavitve → Naprava → Push obvestila**.
+Delujejo na Androidu (Chrome, Edge, Samsung Internet) in na iPhonu/iPadu (iOS 16.4+, aplikacija mora biti
+dodana na domači zaslon). Za delovanje je potreben HTTPS.
+
+- VAPID ključi se ob prvi uporabi samodejno ustvarijo in shranijo v bazo (tabela `app_settings`).
+  Po želji jih lahko nastavite z `VAPID_PUBLIC_KEY` in `VAPID_PRIVATE_KEY`. Neobvezno `VAPID_SUBJECT`
+  (npr. `mailto:ime@domena.si`; privzeto se uporabi `APP_URL` ali e-pošta prvega uporabnika).
+- Vrste obvestil: *Opomniki* (dogodki, roki beležk) in *Spremembe* (vse, kar se pokaže tudi v zvončku).
+- Opomniki za dogodke in beležke tečejo, ne glede na SMTP, dokler `ENABLE_REMINDERS` ni `0`.
+- Če zamenjate ključe, se morajo naprave ponovno naročiti (izklop in vklop obvestil).

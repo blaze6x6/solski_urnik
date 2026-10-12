@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { children, notes } from "@/db/schema";
 import { sendMail, smtpConfigured } from "@/lib/email";
 import { recipientsFor } from "@/lib/recipients";
+import { pushToScope } from "@/lib/push";
 import { dueText, reminderStart } from "@/lib/notes";
 import { escHtml } from "@/lib/text";
 import { formatDateSI, formatDateTimeSI, formatShortSI, toISO, todayISO } from "@/lib/time";
@@ -34,7 +35,6 @@ function noteHtml(n: { title: string; content: string; dueDate: string }, childN
 
 /** Pošlje opomnike za beležke, ki so vstopile v opozorilno okno. Vrne število poslanih. */
 export async function processNoteReminders(now = new Date()): Promise<number> {
-  if (!smtpConfigured()) return 0;
   if (now.getHours() < FROM_HOUR) return 0;
   const today = todayISO();
 
@@ -57,12 +57,22 @@ export async function processNoteReminders(now = new Date()): Promise<number> {
     const alreadySeen = created > start && note.reminderSentFor === null && created === today;
     try {
       if (!alreadySeen) {
-        const recipients = await recipientsFor("reminder", child.userId);
-        const html = noteHtml({ title: note.title, content: note.content, dueDate: due }, child.name);
-        for (const r of recipients) {
-          await sendMail(r.email, `Opomnik: ${note.title} — rok ${formatShortSI(due)}`, html);
+        const pushed = await pushToScope(child.userId, "reminders", {
+          title: `Rok: ${note.title}`,
+          body: `${child.name} · rok ${formatShortSI(due)} (${dueText(due)})${note.content ? ` · ${note.content.slice(0, 120)}` : ""}`,
+          url: `/belezke?otrok=${child.id}`,
+          tag: `note-${note.id}-${due}`,
+        });
+        let mailed = 0;
+        if (smtpConfigured()) {
+          const recipients = await recipientsFor("reminder", child.userId);
+          const html = noteHtml({ title: note.title, content: note.content, dueDate: due }, child.name);
+          for (const r of recipients) {
+            await sendMail(r.email, `Opomnik: ${note.title} — rok ${formatShortSI(due)}`, html);
+          }
+          mailed = recipients.length;
         }
-        if (recipients.length > 0) sent++;
+        if (pushed > 0 || mailed > 0) sent++;
       }
       await db.update(notes).set({ reminderSentFor: due }).where(eq(notes.id, note.id));
     } catch (err) {

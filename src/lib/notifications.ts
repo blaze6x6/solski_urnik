@@ -9,6 +9,7 @@
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationStates, notifications } from "@/db/schema";
+import { pushToScope } from "@/lib/push";
 
 export type NotifKind =
   | "event"
@@ -64,10 +65,25 @@ export async function notifyScope(
           lt(notifications.createdAt, new Date(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000)),
         ),
       );
+    // push obvestilo ostalim članom skupine (ne čaka na rezultat)
+    void pushToScope(
+      actor.scope,
+      "changes",
+      { title: "Šolski urnik", body: `${actor.name}: ${text}`, url: PUSH_URL[kind] ?? "/", tag: `notif-${row.id}` },
+      actor.id,
+    );
   } catch (err) {
     console.error("[obvestila] zapis ni uspel:", err);
   }
 }
+
+const PUSH_URL: Partial<Record<NotifKind, string>> = {
+  event: "/dogodki",
+  timetable: "/urnik",
+  bus: "/avtobus",
+  note: "/belezke",
+  grade: "/ocene",
+};
 
 /** Zadnja obvestila skupine za uporabnika (brez njegovih izbrisanih). */
 export async function listNotifications(

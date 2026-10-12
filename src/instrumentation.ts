@@ -30,8 +30,8 @@ export async function register() {
     scheduleDigest();
   }
 
-  // Opomniki za dogodke — preverjanje vsakih 5 minut
-  if (process.env.SMTP_HOST && process.env.ENABLE_REMINDERS !== "0") {
+  // Opomniki (e-pošta in push) — preverjanje vsakih 5 minut
+  if (process.env.ENABLE_REMINDERS !== "0") {
     scheduleReminders();
   }
 }
