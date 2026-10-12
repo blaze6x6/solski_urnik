@@ -98,6 +98,9 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
           repeat: isRecurring(o.event.recurrence) ? recurrenceLabel(o.event.recurrence) : null,
           range: o.endDate !== o.startDate ? rangeLabel(o.startDate, o.endDate) : rangeLabel(o.startDate, null),
           cancelled: o.cancelled,
+          timeChanged: Boolean(o.timeChanged),
+          startTime: o.event.startTime,
+          endTime: o.event.endTime,
         })),
     };
   });
@@ -120,7 +123,7 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
         iso: o.startDate,
         kind: "event",
         label: o.event.title,
-        sub: `${o.cancelled ? "ODPADE · " : ""}${kidName(o.event.childId) ?? "Vsi otroci"} · ${timeLabel(o.event)}${
+        sub: `${o.cancelled ? "ODPADE · " : ""}${o.timeChanged ? "SPREMENJENA URA · " : ""}${kidName(o.event.childId) ?? "Vsi otroci"} · ${timeLabel(o.event)}${
           o.endDate !== o.startDate ? ` · ${rangeLabel(o.startDate, o.endDate)}` : ""
         }`,
         color: o.event.color,

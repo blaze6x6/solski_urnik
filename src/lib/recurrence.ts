@@ -51,6 +51,8 @@ export type Occurrence = {
   index: number;
   /** ta ponovitev je odpadla (dogodek sam ostane) */
   cancelled: boolean;
+  /** čas te ponovitve je spremenjen samo za ta dan (event že vsebuje nov čas) */
+  timeChanged?: boolean;
 };
 
 const MAX_ITER = 400;

@@ -5,6 +5,7 @@ import {
   busTimetables,
   children,
   eventCancellations,
+  eventTimeOverrides,
   eventReminders,
   events,
   grades,
@@ -152,6 +153,20 @@ export async function cancelledOccurrenceKeys(eventIds: number[]): Promise<Set<s
   return set;
 }
 
+/** Spremenjen čas posameznih ponovitev (ključ `eventId|datum` -> čas). */
+export async function timeOverrideMap(
+  eventIds: number[],
+): Promise<Map<string, { startTime: string; endTime: string | null }>> {
+  const map = new Map<string, { startTime: string; endTime: string | null }>();
+  if (eventIds.length === 0) return map;
+  const rows = await db
+    .select()
+    .from(eventTimeOverrides)
+    .where(inArray(eventTimeOverrides.eventId, eventIds));
+  for (const r of rows) map.set(`${r.eventId}|${r.occurrenceDate}`, { startTime: r.startTime, endTime: r.endTime });
+  return map;
+}
+
 export function occurrenceKey(eventId: number, startDate: string): string {
   return `${eventId}|${startDate}`;
 }
@@ -165,9 +180,21 @@ export async function occurrencesInWindow(childIds: number[], start: string, end
   // ponavljanje brez zadnjega dne se konča s koncem šolskega leta
   const base = applySchoolYearEnd(raw, years);
   const occs = expandEvents(base, start, end);
-  const cancelled = await cancelledOccurrenceKeys([...new Set(occs.map((o) => o.event.id))]);
-  for (const o of occs) o.cancelled = cancelled.has(occurrenceKey(o.event.id, o.startDate));
-  return occs;
+  const ids = [...new Set(occs.map((o) => o.event.id))];
+  const [cancelled, overrides] = await Promise.all([cancelledOccurrenceKeys(ids), timeOverrideMap(ids)]);
+  for (const o of occs) {
+    const key = occurrenceKey(o.event.id, o.startDate);
+    o.cancelled = cancelled.has(key);
+    const ov = overrides.get(key);
+    if (ov) {
+      // čas samo za ta termin: kopija dogodka z drugim časom (izvirnik ostane nespremenjen)
+      o.event = { ...o.event, allDay: false, slotId: null, startTime: ov.startTime, endTime: ov.endTime };
+      o.timeChanged = true;
+    }
+  }
+  return occs.sort(
+    (a, b) => a.startDate.localeCompare(b.startDate) || (a.event.startTime ?? "").localeCompare(b.event.startTime ?? ""),
+  );
 }
 
 /** Vsi opomniki za seznam dogodkov (map: eventId -> minute). */

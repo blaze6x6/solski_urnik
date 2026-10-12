@@ -23,7 +23,7 @@ import {
 import { cn, eventColor, subjectColor } from "@/lib/colors";
 import { findNowSlot, toISO } from "@/lib/time";
 import { setEntryAction, setLessonCancelledAction } from "@/app/actions/timetable";
-import { setOccurrenceCancelledAction } from "@/app/actions/events";
+import { setOccurrenceCancelledAction, setOccurrenceTimeAction } from "@/app/actions/events";
 import { loadChildWeekAction } from "@/app/actions/week";
 import { PdfMenu, type PdfStyle } from "@/components/pdf-menu";
 import { exportTimetablePdf, type PdfPayload } from "@/lib/pdf";
@@ -48,6 +48,12 @@ export type GridEvent = {
   /** začetni datum ponovitve (ključ za »odpade«) */
   occDate: string;
   cancelled: boolean;
+  /** ponavljajoč dogodek (čas je mogoče spremeniti samo za en termin) */
+  recurring: boolean;
+  /** čas tega termina je spremenjen samo za ta dan */
+  timeChanged: boolean;
+  startTime: string | null;
+  endTime: string | null;
   /** opombe (opis) dogodka — null, če jih ni */
   note: string | null;
 };
@@ -264,6 +270,22 @@ export function TimetableGrid({
     startCancelTransition(async () => {
       await setOccurrenceCancelledAction({ eventId, occurrenceDate, cancelled });
       await refreshLocal();
+    });
+  }
+
+  const [timeEdit, setTimeEdit] = useState<{ key: string; start: string; end: string } | null>(null);
+  const [timeError, setTimeError] = useState<string | null>(null);
+
+  function saveEventTime(eventId: number, occurrenceDate: string, start: string | null, end: string | null) {
+    startCancelTransition(async () => {
+      const r = await setOccurrenceTimeAction({ eventId, occurrenceDate, startTime: start, endTime: end });
+      if (r.ok) {
+        setTimeEdit(null);
+        setTimeError(null);
+        await refreshLocal();
+      } else {
+        setTimeError(r.error ?? "Shranjevanje ni uspelo.");
+      }
     });
   }
 
@@ -688,12 +710,82 @@ export function TimetableGrid({
                             )}
                             {cancelPending ? "Shranjujem …" : ev.cancelled ? "Povrni dogodek" : "Dogodek odpade"}
                           </button>
+                          {ev.recurring && !ev.cancelled ? (
+                            timeEdit?.key === `${ev.id}-${ev.occDate}` ? (
+                              <div className="mt-2 rounded-2xl border border-line bg-white p-3">
+                                <p className="mb-1.5 text-[11px] font-semibold text-ink-soft">
+                                  Čas samo za {detailDay.dateLabel}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input
+                                    type="time"
+                                    className="input !w-auto !py-1.5"
+                                    value={timeEdit.start}
+                                    onChange={(e) => setTimeEdit({ ...timeEdit, start: e.target.value })}
+                                    aria-label="Začetek"
+                                  />
+                                  <span className="text-ink-faint">–</span>
+                                  <input
+                                    type="time"
+                                    className="input !w-auto !py-1.5"
+                                    value={timeEdit.end}
+                                    onChange={(e) => setTimeEdit({ ...timeEdit, end: e.target.value })}
+                                    aria-label="Konec"
+                                  />
+                                </div>
+                                {timeError ? <p className="mt-1.5 text-xs font-medium text-[#b3173a]">{timeError}</p> : null}
+                                <div className="mt-2 flex gap-2">
+                                  <button
+                                    disabled={cancelPending}
+                                    onClick={() => saveEventTime(ev.id, ev.occDate, timeEdit.start || null, timeEdit.end || null)}
+                                    className="btn btn-primary !px-3 !py-1.5 text-xs"
+                                  >
+                                    {cancelPending ? "Shranjujem …" : "Shrani"}
+                                  </button>
+                                  <button
+                                    disabled={cancelPending}
+                                    onClick={() => {
+                                      setTimeEdit(null);
+                                      setTimeError(null);
+                                    }}
+                                    className="btn btn-ghost !px-3 !py-1.5 text-xs"
+                                  >
+                                    Prekliči
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 flex gap-2">
+                                <button
+                                  disabled={cancelPending}
+                                  onClick={() => {
+                                    setTimeError(null);
+                                    setTimeEdit({ key: `${ev.id}-${ev.occDate}`, start: ev.startTime ?? "", end: ev.endTime ?? "" });
+                                  }}
+                                  className="btn btn-ghost w-full !text-[#6b7480]"
+                                >
+                                  <Clock3 className="h-4 w-4" strokeWidth={2.4} />
+                                  Spremeni uro
+                                </button>
+                                {ev.timeChanged ? (
+                                  <button
+                                    disabled={cancelPending}
+                                    onClick={() => saveEventTime(ev.id, ev.occDate, null, null)}
+                                    className="btn btn-ghost w-full !text-[#6b7480]"
+                                  >
+                                    <Undo2 className="h-4 w-4" strokeWidth={2.4} />
+                                    Običajna ura
+                                  </button>
+                                ) : null}
+                              </div>
+                            )
+                          ) : null}
                         </div>
                       );
                     })}
                     {detailCell && detailCell.events.length > 0 ? (
                       <p className="text-center text-[11px] text-ink-faint">
-                        »Dogodek odpade« velja samo za ta termin — ostale ponovitve ostanejo.
+                        »Dogodek odpade« in »Spremeni uro« veljata samo za ta termin — ostale ponovitve ostanejo.
                       </p>
                     ) : null}
 

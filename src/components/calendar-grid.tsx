@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Flag, Palmtree, Pencil, Plus, Trash2, Undo2, X, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Flag, Palmtree, Pencil, Plus, Trash2, Undo2, X, XCircle } from "lucide-react";
 import Link from "next/link";
-import { deleteEventAction, setOccurrenceCancelledAction } from "@/app/actions/events";
+import { deleteEventAction, setOccurrenceCancelledAction, setOccurrenceTimeAction } from "@/app/actions/events";
 import { cn, eventColor } from "@/lib/colors";
 import { EventForm, type KidOption, type SlotOption } from "@/components/event-form";
 import { useIsTouch, useSwipeNavigation } from "@/components/use-swipe";
@@ -32,6 +32,10 @@ export type CalCell = {
     repeat: string | null;
     range: string;
     cancelled: boolean;
+    /** čas tega termina je spremenjen samo za ta dan */
+    timeChanged: boolean;
+    startTime: string | null;
+    endTime: string | null;
   }>;
 };
 
@@ -72,6 +76,21 @@ export function CalendarGrid({
   const toggleCancelled = (eventId: number, occDate: string, cancelled: boolean) =>
     startBusy(async () => {
       await setOccurrenceCancelledAction({ eventId, occurrenceDate: occDate, cancelled });
+    });
+
+  // urejanje časa posameznega termina
+  const [timeEdit, setTimeEdit] = useState<{ id: number; start: string; end: string } | null>(null);
+  const [timeError, setTimeError] = useState<string | null>(null);
+
+  const saveTime = (eventId: number, occDate: string, start: string | null, end: string | null) =>
+    startBusy(async () => {
+      const r = await setOccurrenceTimeAction({ eventId, occurrenceDate: occDate, startTime: start, endTime: end });
+      if (r.ok) {
+        setTimeEdit(null);
+        setTimeError(null);
+      } else {
+        setTimeError(r.error ?? "Shranjevanje ni uspelo.");
+      }
     });
 
   const removeEvent = (eventId: number, title: string, recurring: boolean) => {
@@ -299,7 +318,52 @@ export function CalendarGrid({
                         <p className="mt-0.5 text-[11.5px] font-medium" style={{ color: pal.ink, opacity: 0.8 }}>
                           {e.who ?? "Vsi otroci"} · {e.time} · {e.range}
                           {e.repeat ? ` · ponavlja se ${e.repeat}` : ""}
+                          {e.timeChanged ? " · ura spremenjena samo za ta dan" : ""}
                         </p>
+                        {timeEdit?.id === e.id ? (
+                          <div className="mt-2.5 rounded-xl bg-white/80 p-2.5">
+                            <p className="mb-1.5 text-[11px] font-semibold text-ink-soft">Čas samo za {e.range}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="time"
+                                className="input !w-auto !py-1.5"
+                                value={timeEdit.start}
+                                onChange={(ev) => setTimeEdit({ ...timeEdit, start: ev.target.value })}
+                                aria-label="Začetek"
+                              />
+                              <span className="text-ink-faint">–</span>
+                              <input
+                                type="time"
+                                className="input !w-auto !py-1.5"
+                                value={timeEdit.end}
+                                onChange={(ev) => setTimeEdit({ ...timeEdit, end: ev.target.value })}
+                                aria-label="Konec"
+                              />
+                            </div>
+                            {timeError ? <p className="mt-1.5 text-xs font-medium text-[#b3173a]">{timeError}</p> : null}
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => saveTime(e.eventId, e.occDate, timeEdit.start || null, timeEdit.end || null)}
+                                className="btn btn-primary !px-3 !py-1.5 text-xs"
+                              >
+                                Shrani
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => {
+                                  setTimeEdit(null);
+                                  setTimeError(null);
+                                }}
+                                className="btn btn-ghost !px-3 !py-1.5 text-xs"
+                              >
+                                Prekliči
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
                           <button
                             type="button"
@@ -315,6 +379,33 @@ export function CalendarGrid({
                             )}
                             {e.cancelled ? "Povrni" : "Odpade"}
                           </button>
+                          {e.recurring && !e.cancelled ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setTimeError(null);
+                                setTimeEdit({ id: e.id, start: e.startTime ?? "", end: e.endTime ?? "" });
+                              }}
+                              className="chip border border-black/10 bg-white/80 px-2.5 py-1 text-[11.5px] font-semibold text-ink-soft hover:bg-white disabled:opacity-50"
+                              title="Velja samo za ta termin"
+                            >
+                              <Clock3 className="h-3.5 w-3.5" strokeWidth={2.4} />
+                              Spremeni uro
+                            </button>
+                          ) : null}
+                          {e.timeChanged ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => saveTime(e.eventId, e.occDate, null, null)}
+                              className="chip border border-black/10 bg-white/80 px-2.5 py-1 text-[11.5px] font-semibold text-ink-soft hover:bg-white disabled:opacity-50"
+                              title="Vrni običajno uro dogodka"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" strokeWidth={2.4} />
+                              Običajna ura
+                            </button>
+                          ) : null}
                           <Link
                             href={`/dogodki?uredi=${e.eventId}`}
                             className="chip border border-black/10 bg-white/80 px-2.5 py-1 text-[11.5px] font-semibold text-ink-soft hover:bg-white"

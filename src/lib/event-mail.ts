@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
   children,
   eventCancellations,
+  eventTimeOverrides,
   eventReminders,
   events,
   reminderLog,
@@ -241,13 +242,24 @@ export async function processDueReminders(now = new Date()): Promise<number> {
     .where(inArray(eventCancellations.eventId, [...new Set(rows.map((r) => r.event.id))]));
   const cancelled = new Set(cancelledRows.map((c) => `${c.eventId}|${c.occurrenceDate}`));
 
+  // drugačen čas posameznih ponovitev
+  const overrideRows = await db
+    .select()
+    .from(eventTimeOverrides)
+    .where(inArray(eventTimeOverrides.eventId, [...new Set(rows.map((r) => r.event.id))]));
+  const overrides = new Map(overrideRows.map((o) => [`${o.eventId}|${o.occurrenceDate}`, o]));
+
   const years = await db.select().from(schoolYears);
 
   for (const { reminder, event: rawEv } of rows) {
     const ev = applySchoolYearEnd([rawEv], years)[0];
     const occs = occurrencesInRange(ev, windowStart, windowEnd);
-    for (const occ of occs) {
-      if (cancelled.has(`${ev.id}|${occ.startDate}`)) continue;
+    for (const occ0 of occs) {
+      if (cancelled.has(`${ev.id}|${occ0.startDate}`)) continue;
+      const ov = overrides.get(`${ev.id}|${occ0.startDate}`);
+      const occ = ov
+        ? { ...occ0, event: { ...occ0.event, allDay: false, slotId: null, startTime: ov.startTime, endTime: ov.endTime } }
+        : occ0;
       const triggerAt = occurrenceStartDate(occ).getTime() - reminder.minutesBefore * 60_000;
       const diff = now.getTime() - triggerAt;
       if (diff < 0 || diff > toleranceMs) continue;
@@ -262,7 +274,7 @@ export async function processDueReminders(now = new Date()): Promise<number> {
       if (already[0]) continue;
 
       try {
-        await sendReminderMail(ev, occ.startDate, occ.endDate, reminder.minutesBefore);
+        await sendReminderMail(occ.event, occ.startDate, occ.endDate, reminder.minutesBefore);
         await db.insert(reminderLog).values({ reminderId: reminder.id, occurrenceDate: occ.startDate });
         sent++;
       } catch (err) {

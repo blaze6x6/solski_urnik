@@ -250,6 +250,26 @@ export const eventCancellations = pgTable(
 );
 
 /**
+ * Drugačen čas ene same ponovitve ponavljajočega dogodka (npr. danes 16–17
+ * namesto 17–18). Dogodek in ostale ponovitve ostanejo nespremenjeni.
+ */
+export const eventTimeOverrides = pgTable(
+  "event_time_overrides",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** začetni datum konkretne ponovitve dogodka */
+    occurrenceDate: date("occurrence_date", { mode: "string" }).notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("event_time_override_once").on(t.eventId, t.occurrenceDate)],
+);
+
+/**
  * Odpadle ure pouka (npr. učitelj je odsoten): predmet ostane v urniku,
  * ta konkretni datum pa je prečrtan in označen z »Odpade«.
  */

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { children, eventCancellations, eventReminders, events } from "@/db/schema";
+import { children, eventCancellations, eventReminders, events, eventTimeOverrides } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { eventScopeFilter } from "@/lib/data";
 import { notifyScope } from "@/lib/notifications";
@@ -230,4 +230,63 @@ export async function setOccurrenceCancelledAction(input: {
       : `Dogodek »${owned[0].title}« je spet na sporedu (${formatDayMonthSI(date)})`,
   );
   revalidatePath("/", "layout");
+}
+
+/**
+ * Spremeni čas samo ene ponovitve dogodka (npr. danes 16–17 namesto 17–18).
+ * `startTime` = null ponastavi termin na običajni čas dogodka.
+ */
+export async function setOccurrenceTimeAction(input: {
+  eventId: number;
+  /** začetni datum ponovitve (YYYY-MM-DD) */
+  occurrenceDate: string;
+  startTime: string | null;
+  endTime: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  const eventId = Number(input.eventId);
+  const date = String(input.occurrenceDate ?? "");
+  if (!eventId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Neveljaven termin." };
+
+  const ownedKids = (
+    await db.select({ id: children.id }).from(children).where(eq(children.userId, user.scope))
+  ).map((c) => c.id);
+  const owned = await db
+    .select({ id: events.id, title: events.title })
+    .from(events)
+    .where(and(eq(events.id, eventId), eventScopeFilter(ownedKids, user.scope)))
+    .limit(1);
+  if (!owned[0]) return { ok: false, error: "Dogodka ni mogoče najti." };
+
+  const start = input.startTime ? normalizeTime(input.startTime) : null;
+  const end = input.endTime ? normalizeTime(input.endTime) : null;
+
+  if (!input.startTime) {
+    await db
+      .delete(eventTimeOverrides)
+      .where(and(eq(eventTimeOverrides.eventId, eventId), eq(eventTimeOverrides.occurrenceDate, date)));
+    await notifyScope(user, "event", "updated", `Dogodek »${owned[0].title}« ima spet običajen čas (${formatDayMonthSI(date)})`);
+    revalidatePath("/", "layout");
+    return { ok: true };
+  }
+
+  if (!start) return { ok: false, error: "Vnesite začetek ob (HH:MM)." };
+  if (end && end <= start) return { ok: false, error: "Konec mora biti po začetku." };
+
+  await db
+    .insert(eventTimeOverrides)
+    .values({ eventId, occurrenceDate: date, startTime: start, endTime: end })
+    .onConflictDoUpdate({
+      target: [eventTimeOverrides.eventId, eventTimeOverrides.occurrenceDate],
+      set: { startTime: start, endTime: end },
+    });
+
+  await notifyScope(
+    user,
+    "event",
+    "updated",
+    `Dogodek »${owned[0].title}« je ${formatDayMonthSI(date)} ob ${start}${end ? `–${end}` : ""}`,
+  );
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

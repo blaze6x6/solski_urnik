@@ -518,12 +518,12 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
       {/* ------------------------- NAPRAVA ------------------------- */}
       {tab === "naprava" ? (
         <>
-          <InstallPanel />
           <PushPanel
             publicKey={await getVapidPublicKey()}
             kinds={PUSH_KINDS}
             subs={(await listSubscriptions(user.id)).map((x) => ({ endpoint: x.endpoint, kinds: x.kinds.split(",").filter(Boolean) }))}
           />
+          <InstallPanel />
         </>
       ) : null}
 

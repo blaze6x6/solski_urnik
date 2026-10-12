@@ -134,6 +134,10 @@ export async function buildChildWeek(
           clock: clockLabel(h.event),
           occDate: h.startDate,
           cancelled: h.cancelled,
+          recurring: isRecurring(h.event.recurrence),
+          timeChanged: Boolean(h.timeChanged),
+          startTime: h.event.startTime,
+          endTime: h.event.endTime,
           note: h.event.description?.trim() || null,
         })),
       };
