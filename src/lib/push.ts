@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { generateKeyPairSync } from "node:crypto";
+import { cookies } from "next/headers";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings, pushSubscriptions, users, type PushSubscriptionRow } from "@/db/schema";
@@ -130,21 +131,22 @@ export async function pushToScope(
   scopeId: number,
   kind: PushKind,
   payload: PushPayload,
-  excludeUserId?: number,
+  /** naprava (id naročnine), ki je spremembo naredila — nanjo ne pošljemo */
+  excludeSubscriptionId?: number,
 ): Promise<number> {
   try {
     const members = await db.select({ id: users.id, householdId: users.householdId }).from(users);
-    const ids = members.filter((u) => (u.householdId ?? u.id) === scopeId && u.id !== excludeUserId).map((u) => u.id);
+    const ids = members.filter((u) => (u.householdId ?? u.id) === scopeId).map((u) => u.id);
     if (ids.length === 0) return 0;
     const subs = await db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.userId, ids));
+    const targets = subs.filter((s) => s.kinds.split(",").includes(kind) && s.id !== excludeSubscriptionId);
     let sent = 0;
     await Promise.all(
-      subs
-        .filter((s) => s.kinds.split(",").includes(kind))
-        .map(async (s) => {
-          if ((await sendPushTo(s, payload)) === "ok") sent++;
-        }),
+      targets.map(async (s) => {
+        if ((await sendPushTo(s, payload)) === "ok") sent++;
+      }),
     );
+    console.log(`[push] ${kind}: naprav v skupini ${subs.length}, ciljnih ${targets.length}, poslanih ${sent}`);
     return sent;
   } catch (err) {
     console.warn("[push] napaka:", err);
@@ -159,4 +161,20 @@ export async function listSubscriptions(userId: number) {
 export async function removeOtherUsersOfEndpoint(userId: number, endpoint: string) {
   // ista naprava se je prijavila z drugim računom: naročnina preide na novega
   await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.endpoint, endpoint), ne(pushSubscriptions.userId, userId)));
+}
+
+// --- »ta naprava« --------------------------------------------------------------
+// Naprava, ki je naredila spremembo, ne dobi push obvestila zanjo. Naprava si
+// ob vklopu zapiše piškotek z id-jem svoje naročnine.
+
+export const PUSH_DEVICE_COOKIE = "urnik_push_naprava";
+
+export async function currentDeviceId(): Promise<number | undefined> {
+  try {
+    const v = (await cookies()).get(PUSH_DEVICE_COOKIE)?.value;
+    const n = Number(v);
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+  } catch {
+    return undefined; // ni zahtevka (npr. opomniki po urniku)
+  }
 }
