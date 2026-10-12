@@ -39,6 +39,8 @@ import { PasswordForm } from "@/components/password-form";
 import { UsersPanel, type PanelUser } from "@/components/users-panel";
 import { SuperadminPanel } from "@/components/superadmin-panel";
 import { InstallPanel } from "@/components/pwa";
+import { PushPanel } from "@/components/push-panel";
+import { PUSH_KINDS, getVapidPublicKey, listSubscriptions } from "@/lib/push";
 import { listUserEmails } from "@/lib/recipients";
 
 export const metadata = { title: "Nastavitve" };
@@ -514,7 +516,16 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
       ) : null}
 
       {/* ------------------------- NAPRAVA ------------------------- */}
-      {tab === "naprava" ? <InstallPanel /> : null}
+      {tab === "naprava" ? (
+        <>
+          <InstallPanel />
+          <PushPanel
+            publicKey={await getVapidPublicKey()}
+            kinds={PUSH_KINDS}
+            subs={(await listSubscriptions(user.id)).map((x) => ({ endpoint: x.endpoint, kinds: x.kinds.split(",").filter(Boolean) }))}
+          />
+        </>
+      ) : null}
 
       {/* ------------------------- E-POŠTA ------------------------- */}
       {tab === "posta" ? (

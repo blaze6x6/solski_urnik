@@ -419,3 +419,29 @@ export type SchoolYear = typeof schoolYears.$inferSelect;
 export type SchoolBreak = typeof schoolBreaks.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Grade = typeof grades.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Push obvestila (Web Push) in splošne nastavitve strežnika
+// ---------------------------------------------------------------------------
+
+/** Naprave, ki so vklopile push obvestila (ena oseba jih ima lahko več). */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  /** vrste obvestil, ločene z vejico: reminders, changes */
+  kinds: text("kinds").notNull().default("reminders,changes"),
+  userAgent: text("user_agent").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** Preprost ključ/vrednost (npr. samodejno ustvarjeni VAPID ključi). */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: urnik-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -19,7 +18,6 @@ services:
   # Hrani: 7 dnevnih, 4 tedenske in 6 mesečnih kopij.
   backup:
     image: prodrigestivill/postgres-backup-local:16
-    container_name: urnik-db-backup
     restart: unless-stopped
     depends_on:
       db:
@@ -34,15 +32,13 @@ services:
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
       BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
       BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
-      BACKUP_ON_START: ${BACKUP_ON_START:-true}
       HEALTHCHECK_PORT: 8080
       TZ: Europe/Ljubljana
     volumes:
       - ${BACKUP_DIR:-./backups}:/backups
 
   app:
-    image: blaze666/solski_urnik:latest
-    container_name: urnik-app
+    build: .
     restart: unless-stopped
     depends_on:
       db:
@@ -53,11 +49,11 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
       TZ: Europe/Ljubljana
       # Privzeti administrator ob prvem zagonu (ustvari se samo, če je baza prazna)
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@urnik.si}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-urnik123}
       # E-poštni povzetki (neobvezno — brez tega je pošiljanje onemogočeno)
       SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
@@ -66,6 +62,7 @@ services:
       ENABLE_REMINDERS: ${ENABLE_REMINDERS:-1}
       REMINDER_INTERVAL_MIN: ${REMINDER_INTERVAL_MIN:-5}
       CRON_SECRET: ${CRON_SECRET:-}
+      # Javni naslov aplikacije (za povezave v e-pošti, npr. ponastavitev gesla); sicer se uporabi naslov zahteve
       APP_URL: ${APP_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]

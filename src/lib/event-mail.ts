@@ -31,6 +31,7 @@ import { addDaysISO, formatDateSI, formatDateTimeSI, formatShortSI, todayISO } f
 import { escHtml } from "@/lib/text";
 import { recipientsFor } from "@/lib/recipients";
 import { reminderLabel } from "@/lib/reminder-labels";
+import { pushToScope } from "@/lib/push";
 
 export { reminderLabel };
 
@@ -40,6 +41,15 @@ async function childNameFor(ev: SchoolEvent): Promise<string | null> {
   if (ev.childId === null) return null;
   const rows = await db.select({ name: children.name }).from(children).where(eq(children.id, ev.childId)).limit(1);
   return rows[0]?.name ?? null;
+}
+
+async function scopeIdFor(ev: SchoolEvent): Promise<number> {
+  if (ev.scopeId !== null && ev.scopeId !== undefined) return ev.scopeId;
+  if (ev.childId !== null) {
+    const rows = await db.select({ userId: children.userId }).from(children).where(eq(children.id, ev.childId)).limit(1);
+    if (rows[0]) return rows[0].userId;
+  }
+  return 0;
 }
 
 async function slotTimeFor(ev: SchoolEvent): Promise<{ start: string; end: string } | null> {
@@ -161,7 +171,23 @@ async function sendReminderMail(ev: SchoolEvent, occStart: string, occEnd: strin
     minutesFor(ev.id),
     recipientsFor("reminder", ev.scopeId),
   ]);
-  if (recipients.length === 0) return;
+
+  // push obvestilo (neodvisno od e-pošte)
+  const whenText = ev.allDay ? "cel dan" : ev.startTime ? timeLabel(ev) : slot ? `${slot.start}–${slot.end}` : "cel dan";
+  await pushToScope(await scopeIdFor(ev), "reminders", {
+    title: `Opomnik: ${ev.title}`,
+    body: [
+      `${formatShortSI(occStart)} · ${whenText}`,
+      childName ?? "Vsi otroci",
+      ev.location || null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    url: "/dogodki",
+    tag: `event-${ev.id}-${occStart}`,
+  });
+
+  if (!smtpConfigured() || recipients.length === 0) return;
 
   const rows: Array<[string, string]> = [
     ["Kdaj", whenRow(ev, occStart, occEnd, slot)],
@@ -194,7 +220,6 @@ async function sendReminderMail(ev: SchoolEvent, occStart: string, occEnd: strin
  * strežnika opomnik vseeno pošlje, a ne pošilja starih).
  */
 export async function processDueReminders(now = new Date()): Promise<number> {
-  if (!smtpConfigured()) return 0;
 
   const rows = await db
     .select({ reminder: eventReminders, event: events })
