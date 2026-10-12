@@ -17,7 +17,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Gradnja in objava slike Urnik
+      # Ta korak se izvede SAMO, ko release NI označen kot "pre-release" (produkcija)
+      - name: Gradnja in objava slike Urnik (PRODUKCIJA)
+        if: github.event.release.prerelease == false
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -25,4 +27,16 @@ jobs:
           push: true
           tags: |
             blaze666/solski_urnik:latest
+            blaze666/solski_urnik:${{ github.ref_name }}
+
+      # Ta korak se izvede SAMO, ko obkljukaš "Set as a pre-release" (beta verzija)
+      - name: Gradnja in objava slike Urnik (BETA)
+        if: github.event.release.prerelease == true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            blaze666/solski_urnik:beta
             blaze666/solski_urnik:${{ github.ref_name }}
