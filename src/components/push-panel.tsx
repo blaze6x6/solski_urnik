@@ -43,6 +43,7 @@ export function PushPanel({ publicKey, kinds, subs }: Props) {
   const [selected, setSelected] = useState<string[]>(kinds.map((k) => k.key));
   const [message, setMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const [swState, setSwState] = useState<"none" | "ok">("none");
 
   const refresh = useCallback(async () => {
     const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -50,6 +51,7 @@ export function PushPanel({ publicKey, kinds, subs }: Props) {
     if (!ok) return;
     setPermission(Notification.permission);
     const reg = await navigator.serviceWorker.getRegistration();
+    setSwState(reg ? "ok" : "none");
     const sub = await reg?.pushManager.getSubscription();
     setEndpoint(sub?.endpoint ?? null);
     if (sub) {
@@ -187,16 +189,10 @@ export function PushPanel({ publicKey, kinds, subs }: Props) {
 
           <div className="flex flex-wrap gap-2">
             {enabled ? (
-              <>
-                <button onClick={test} disabled={pending} className="btn btn-primary">
-                  <Send className="h-4 w-4" strokeWidth={2.2} />
-                  Pošlji preizkus
-                </button>
-                <button onClick={disable} disabled={pending} className="btn btn-ghost">
-                  <BellOff className="h-4 w-4" strokeWidth={2.2} />
-                  Izklopi na tej napravi
-                </button>
-              </>
+              <button onClick={disable} disabled={pending} className="btn btn-ghost">
+                <BellOff className="h-4 w-4" strokeWidth={2.2} />
+                Izklopi na tej napravi
+              </button>
             ) : (
               <button onClick={enable} disabled={pending || supported === null || permission === "denied" || selected.length === 0} className="btn btn-primary">
                 <Bell className="h-4 w-4" strokeWidth={2.2} />
@@ -204,7 +200,22 @@ export function PushPanel({ publicKey, kinds, subs }: Props) {
               </button>
             )}
           </div>
+          <button onClick={test} disabled={pending || !enabled} className="btn btn-primary w-full sm:w-auto" title={enabled ? "" : "Najprej vklopite obvestila na tej napravi"}>
+            <Send className="h-4 w-4" strokeWidth={2.2} />
+            Pošlji preizkus
+          </button>
           {enabled ? null : selected.length === 0 ? <p className="text-xs text-ink-faint">Izberite vsaj eno vrsto obvestil.</p> : null}
+
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-xl bg-paper px-4 py-3 text-xs">
+            <dt className="text-ink-faint">Podpora brskalnika</dt>
+            <dd className="font-semibold">{supported === null ? "…" : supported ? "da" : "ne"}</dd>
+            <dt className="text-ink-faint">Service worker</dt>
+            <dd className="font-semibold">{swState === "ok" ? "registriran" : "ni registriran (osvežite stran)"}</dd>
+            <dt className="text-ink-faint">Dovoljenje za obvestila</dt>
+            <dd className="font-semibold">{permission === "granted" ? "dovoljeno" : permission === "denied" ? "blokirano" : "še ni izbrano"}</dd>
+            <dt className="text-ink-faint">Naročnina na tej napravi</dt>
+            <dd className="font-semibold">{endpoint ? "aktivna" : "ni"}</dd>
+          </dl>
 
           {message ? (
             <p
