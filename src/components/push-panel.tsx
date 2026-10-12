@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Bell, BellOff, BellRing, Send } from "lucide-react";
 import {
+  markPushDeviceAction,
   removePushSubscriptionAction,
   savePushSubscriptionAction,
   sendTestPushAction,
@@ -53,7 +54,10 @@ export function PushPanel({ publicKey, kinds, subs }: Props) {
     setEndpoint(sub?.endpoint ?? null);
     if (sub) {
       const known = subs.find((s) => s.endpoint === sub.endpoint);
-      if (known) setSelected(known.kinds);
+      if (known) {
+        setSelected(known.kinds);
+        void markPushDeviceAction(sub.endpoint);
+      }
     }
   }, [subs]);
 
