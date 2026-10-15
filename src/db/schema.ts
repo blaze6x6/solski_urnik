@@ -35,6 +35,27 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/**
+ * Vabila po e-pošti. `scopeId` = null pomeni vabilo za NOVO, ločeno skupino
+ * (pošlje ga superadministrator); sicer vabilo v obstoječo skupino (pošlje ga
+ * njen administrator) — povabljenec se ob registraciji samodejno pridruži.
+ */
+export const invitations = pgTable("invitations", {
+  id: serial("id").primaryKey(),
+  /** SHA-256 žetona iz povezave (žeton sam se ne hrani) */
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email").notNull(),
+  scopeId: integer("scope_id"),
+  invitedBy: integer("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Invitation = typeof invitations.$inferSelect;
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: integer("user_id")

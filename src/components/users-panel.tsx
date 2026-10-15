@@ -25,6 +25,9 @@ import {
   type UserFormState,
 } from "@/app/actions/users";
 import { cn } from "@/lib/colors";
+import { createMemberInviteAction } from "@/app/actions/invites";
+import { InviteForm } from "@/components/invite-forms";
+import type { PendingInvite } from "@/lib/invites";
 
 export type PanelEmail = {
   id: number;
@@ -292,7 +295,7 @@ function AddEmailForm({ userId }: { userId: number }) {
   );
 }
 
-export function UsersPanel({ users }: { users: PanelUser[] }) {
+export function UsersPanel({ users, invites }: { users: PanelUser[]; invites: PendingInvite[] }) {
   const [state, formAction, pending] = useActionState<UserFormState, FormData>(createUserAction, undefined);
 
   return (
@@ -307,6 +310,14 @@ export function UsersPanel({ users }: { users: PanelUser[] }) {
         ))}
       </div>
 
+      <div className="space-y-6">
+      <InviteForm
+        action={createMemberInviteAction}
+        title="Povabi člana po e-pošti"
+        description="Povabljenec prejme povezavo, si ob registraciji sam izbere geslo in se samodejno pridruži vaši skupini (iste otroke, urnike in dogodke)."
+        invites={invites}
+        emptyText="Ni čakajočih vabil."
+      />
       <form action={formAction} className="card h-fit space-y-4 p-5">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-spruce to-spruce-2 text-white">
@@ -345,6 +356,7 @@ export function UsersPanel({ users }: { users: PanelUser[] }) {
           {pending ? "Dodajam …" : "Dodaj administratorja"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

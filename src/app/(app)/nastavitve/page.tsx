@@ -42,6 +42,7 @@ import { InstallPanel } from "@/components/pwa";
 import { PushPanel } from "@/components/push-panel";
 import { PUSH_KINDS, getVapidPublicKey, listSubscriptions } from "@/lib/push";
 import { listUserEmails } from "@/lib/recipients";
+import { pendingInvites } from "@/lib/invites";
 
 export const metadata = { title: "Nastavitve" };
 
@@ -508,11 +509,11 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
       ) : null}
 
       {/* ------------------------- UPORABNIKI ------------------------- */}
-      {tab === "uporabniki" ? <UsersPanel users={members} /> : null}
+      {tab === "uporabniki" ? <UsersPanel users={members} invites={await pendingInvites(user.scope)} /> : null}
 
       {/* ------------------------- SUPERADMIN ------------------------- */}
       {tab === "superadmin" && user.isSuperadmin ? (
-        <SuperadminPanel households={await getAllHouseholds()} selfId={user.id} />
+        <SuperadminPanel households={await getAllHouseholds()} selfId={user.id} invites={await pendingInvites(null)} />
       ) : null}
 
       {/* ------------------------- NAPRAVA ------------------------- */}

@@ -5,6 +5,9 @@ import { Check, Copy, KeyRound, ShieldCheck, Trash2, Users } from "lucide-react"
 import { superDeleteUserAction, superResetPasswordAction, type TempPasswordState } from "@/app/actions/users";
 import type { HouseholdOverview } from "@/lib/data";
 import { DOGODEK, OTROK, UPORABNIK, count } from "@/lib/plural";
+import { createGroupInviteAction } from "@/app/actions/invites";
+import { InviteForm } from "@/components/invite-forms";
+import type { PendingInvite } from "@/lib/invites";
 
 function DeleteButton({
   id,
@@ -84,9 +87,11 @@ function ResetPasswordButton({ id, name }: { id: number; name: string }) {
 export function SuperadminPanel({
   households,
   selfId,
+  invites,
 }: {
   households: HouseholdOverview[];
   selfId: number;
+  invites: PendingInvite[];
 }) {
   return (
     <div className="space-y-5">
@@ -101,6 +106,16 @@ export function SuperadminPanel({
           člane skupine, otroke, urnike, predmete in dogodke. Gesel ni mogoče prebrati
           (v bazi so shranjena samo zgoščena), lahko pa uporabniku ustvarite novo začasno geslo.
         </p>
+      </div>
+
+      <div className="max-w-xl">
+        <InviteForm
+          action={createGroupInviteAction}
+          title="Povabi novo skupino"
+          description="Povabljenec prejme povezavo na e-pošto, ustvari svoj račun in postane lastnik/administrator nove, ločene skupine (lastni otroci, urniki in dogodki). Nato lahko sam vabi druge člane."
+          invites={invites}
+          emptyText="Ni čakajočih vabil za nove skupine."
+        />
       </div>
 
       {households.map((h) => {
