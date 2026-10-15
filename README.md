@@ -152,3 +152,10 @@ dodana na domači zaslon). Za delovanje je potreben HTTPS.
 - Vrste obvestil: *Opomniki* (dogodki, roki beležk) in *Spremembe* (vse, kar se pokaže tudi v zvončku).
 - Opomniki za dogodke in beležke tečejo, ne glede na SMTP, dokler `ENABLE_REMINDERS` ni `0`.
 - Če zamenjate ključe, se morajo naprave ponovno naročiti (izklop in vklop obvestil).
+
+## Vabila po e-pošti
+
+- **Superadmin → Nastavitve → Superadmin → »Povabi novo skupino«**: pošlje povezavo `/vabilo?token=…`. Povabljenec si ustvari račun in postane lastnik nove, ločene skupine.
+- **Nastavitve → Uporabniki → »Povabi člana po e-pošti«** (vsak administrator skupine): povabljenec se ob registraciji samodejno pridruži njegovi skupini.
+- Povezava velja 7 dni, deluje samo enkrat, v bazi je shranjena samo zgoščena vrednost žetona. E-pošta v obrazcu je zaklenjena na povabljeni naslov.
+- Če SMTP ni nastavljen, aplikacija po ustvarjanju vabila prikaže povezavo, ki jo lahko pošljete ročno. Za pravilne povezave v e-pošti nastavite `APP_URL`.
