@@ -14,13 +14,12 @@ function refresh() {
   revalidatePath("/", "layout");
 }
 
-/** Dodaj novega administratorja v isto skupino (deli vse podatke). */
+/** Dodaj novega administratorja v svojo skupino (deli vse podatke). Nove skupine ustvarja samo superadmin. */
 export async function createUserAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   const me = await requireUser();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const shared = formData.get("shared") !== null;
 
   if (!name || !email) return { error: "Vnesite ime in e-pošto." };
   if (password.length < 6) return { error: "Geslo mora imeti vsaj 6 znakov." };
@@ -32,13 +31,33 @@ export async function createUserAction(_prev: UserFormState, formData: FormData)
     name,
     email,
     passwordHash: hashPassword(password),
-    // skupni dostop do istih otrok/urnikov, sicer samostojna skupina (householdId ostane null)
-    householdId: shared ? me.scope : null,
+    // vedno v skupino tistega, ki dodaja (skupni dostop do istih otrok/urnikov)
+    householdId: me.scope,
   });
-  if (shared) await notifyScope(me, "user", "created", `Dodan administrator ${name}`);
+  await notifyScope(me, "user", "created", `Dodan administrator ${name}`);
 
   refresh();
   return { ok: `Uporabnik ${name} je dodan.` };
+}
+
+/** Superadmin ročno ustvari novo, ločeno skupino: nov uporabnik postane njen lastnik. */
+export async function createGroupAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
+  await requireSuperadmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  if (!name || !email) return { error: "Vnesite ime in e-pošto." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Vnesite veljaven e-poštni naslov." };
+  if (password.length < 6) return { error: "Geslo mora imeti vsaj 6 znakov." };
+
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  if (existing[0]) return { error: "Uporabnik s to e-pošto že obstaja." };
+
+  // householdId = null → lastnik svoje nove skupine
+  await db.insert(users).values({ name, email, passwordHash: hashPassword(password), householdId: null });
+  refresh();
+  return { ok: `Nova skupina je ustvarjena. Lastnik: ${name}.` };
 }
 
 /** Preimenuj uporabnika oz. spremeni njegovo e-pošto (znotraj iste skupine). */

@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Check, Copy, KeyRound, ShieldCheck, Trash2, Users } from "lucide-react";
-import { superDeleteUserAction, superResetPasswordAction, type TempPasswordState } from "@/app/actions/users";
+import { Check, CircleAlert, CircleCheck, Copy, KeyRound, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { createGroupAction, superDeleteUserAction, superResetPasswordAction, type TempPasswordState, type UserFormState } from "@/app/actions/users";
 import type { HouseholdOverview } from "@/lib/data";
 import { DOGODEK, OTROK, UPORABNIK, count } from "@/lib/plural";
 import { createGroupInviteAction } from "@/app/actions/invites";
@@ -84,6 +84,52 @@ function ResetPasswordButton({ id, name }: { id: number; name: string }) {
   );
 }
 
+/** Ročno ustvarjanje nove, ločene skupine (lastnik z začetnim geslom). */
+function CreateGroupForm() {
+  const [state, formAction, pending] = useActionState<UserFormState, FormData>(createGroupAction, undefined);
+  return (
+    <form action={formAction} className="card h-fit space-y-4 p-5">
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-spruce to-spruce-2 text-white">
+          <UserPlus className="h-4.5 w-4.5" strokeWidth={2.2} />
+        </span>
+        <h3 className="font-display text-lg font-semibold">Ustvari novo skupino ročno</h3>
+      </div>
+      <p className="text-sm text-ink-soft">
+        Nov uporabnik postane lastnik nove, ločene skupine (lastni otroci, urniki in dogodki).
+      </p>
+      {state?.error ? (
+        <p className="flex items-center gap-2 rounded-xl border border-[#fbc9d4] bg-[#ffe3e9] px-4 py-3 text-sm font-medium text-[#a4123a]">
+          <CircleAlert className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+          {state.error}
+        </p>
+      ) : null}
+      {state?.ok ? (
+        <p className="flex items-center gap-2 rounded-xl border border-[#aeeccd] bg-[#d8f8ea] px-4 py-3 text-sm font-medium text-[#046c46]">
+          <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+          {state.ok}
+        </p>
+      ) : null}
+      <div>
+        <label className="label" htmlFor="ng-name">Ime in priimek lastnika</label>
+        <input id="ng-name" name="name" required className="input" placeholder="npr. Nina Novak" />
+      </div>
+      <div>
+        <label className="label" htmlFor="ng-email">E-pošta</label>
+        <input id="ng-email" name="email" type="email" required className="input" placeholder="nina@primer.si" />
+      </div>
+      <div>
+        <label className="label" htmlFor="ng-pass">Začetno geslo</label>
+        <input id="ng-pass" name="password" type="password" required minLength={6} className="input" placeholder="min. 6 znakov" />
+      </div>
+      <button className="btn btn-primary w-full" disabled={pending}>
+        <UserPlus className="h-4 w-4" strokeWidth={2.2} />
+        {pending ? "Ustvarjam …" : "Ustvari skupino"}
+      </button>
+    </form>
+  );
+}
+
 export function SuperadminPanel({
   households,
   selfId,
@@ -108,7 +154,7 @@ export function SuperadminPanel({
         </p>
       </div>
 
-      <div className="max-w-xl">
+      <div className="grid gap-5 lg:grid-cols-2">
         <InviteForm
           action={createGroupInviteAction}
           title="Povabi novo skupino"
@@ -116,6 +162,7 @@ export function SuperadminPanel({
           invites={invites}
           emptyText="Ni čakajočih vabil za nove skupine."
         />
+        <CreateGroupForm />
       </div>
 
       {households.map((h) => {

@@ -341,15 +341,9 @@ export function UsersPanel({ users, invites }: { users: PanelUser[]; invites: Pe
           <input id="nu-pass" name="password" type="password" required minLength={6} className="input" placeholder="min. 6 znakov" />
         </div>
 
-        <label className="flex items-start gap-2.5 rounded-xl border border-line bg-white px-3.5 py-2.5">
-          <input type="checkbox" name="shared" defaultChecked className="mt-0.5 h-4 w-4 rounded accent-spruce" />
-          <span className="text-sm font-medium">
-            Skupni dostop do istih podatkov
-            <span className="block text-xs font-normal text-ink-faint">
-              Odkljukano pomeni samostojen račun z lastnimi otroki in urniki.
-            </span>
-          </span>
-        </label>
+        <p className="text-xs text-ink-faint">
+          Nov administrator se doda v vašo skupino in vidi iste otroke, urnike in dogodke.
+        </p>
 
         <button className="btn btn-primary w-full" disabled={pending}>
           <UserPlus className="h-4 w-4" strokeWidth={2.2} />
