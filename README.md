@@ -159,3 +159,4 @@ dodana na domači zaslon). Za delovanje je potreben HTTPS.
 - **Nastavitve → Uporabniki → »Povabi člana po e-pošti«** (vsak administrator skupine): povabljenec se ob registraciji samodejno pridruži njegovi skupini.
 - Povezava velja 7 dni, deluje samo enkrat, v bazi je shranjena samo zgoščena vrednost žetona. E-pošta v obrazcu je zaklenjena na povabljeni naslov.
 - Če SMTP ni nastavljen, aplikacija po ustvarjanju vabila prikaže povezavo, ki jo lahko pošljete ročno. Za pravilne povezave v e-pošti nastavite `APP_URL`.
+- Nove skupine ustvarja samo superadmin (ročno z začetnim geslom ali z vabilom). Administrator skupine doda novega administratorja vedno v svojo skupino (ročno ali z vabilom).
