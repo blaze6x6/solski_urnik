@@ -134,6 +134,62 @@
       "when": 1791643082067,
       "tag": "0018_invitations",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791729482067,
+      "tag": "0019_impersonation",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791815882067,
+      "tag": "0020_note_keep_open",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791902282067,
+      "tag": "0021_event_occurrence_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791988682067,
+      "tag": "0022_registration_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792075082067,
+      "tag": "0023_child_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792161482067,
+      "tag": "0024_child_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792247882067,
+      "tag": "0025_child_extra_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792334282067,
+      "tag": "0026_user_phone",
+      "breakpoints": true
     }
   ]
 }

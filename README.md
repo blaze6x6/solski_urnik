@@ -160,3 +160,72 @@ dodana na domači zaslon). Za delovanje je potreben HTTPS.
 - Povezava velja 7 dni, deluje samo enkrat, v bazi je shranjena samo zgoščena vrednost žetona. E-pošta v obrazcu je zaklenjena na povabljeni naslov.
 - Če SMTP ni nastavljen, aplikacija po ustvarjanju vabila prikaže povezavo, ki jo lahko pošljete ročno. Za pravilne povezave v e-pošti nastavite `APP_URL`.
 - Nove skupine ustvarja samo superadmin (ročno z začetnim geslom ali z vabilom). Administrator skupine doda novega administratorja vedno v svojo skupino (ročno ali z vabilom).
+
+## Superadmin: »Odpri kot«
+
+Superadmin lahko v zavihku Superadmin pri uporabniku klikne **Odpri kot**. Aplikacija se odpre z računom tega uporabnika (seja velja 2 uri), spodaj pa je vidna vrstica s gumbom **Končaj ogled**, ki vrne superadmina v lastni račun. Odpiranje se zapiše v dnevnik strežnika (`[superadmin] …`). Drugih superadminov ni mogoče odpreti, med ogledom pa so superadmin funkcije onemogočene. V ogledu sta EMŠO in davčna številka otrok skrita (na strežniku) in ju ni mogoče brati ali spreminjati.
+
+## Beležke s potekom roka
+
+Beležka z rokom se dan po roku samodejno označi kot **opravljena** in izgine s Pregleda (preverjanje ob branju in vsakih nekaj minut). Če jo ročno ponovno odprete, ostane odprta, dokler ne spremenite roka.
+
+## Opombe dogodkov
+
+Dogodki z opombo so označeni z ikono beležke. Na Pregledu (Dogodki ta dan), v Urniku (Dogodki v tem tednu) in v Koledarju (v oknu dneva je opomba vidna kar v kartici dogodka) se vsebina opombe odpre v modalnem oknu.
+
+## Opomba samo za en termin
+
+Pri vsakem dogodku lahko v Koledarju (okno dneva) ali Urniku (okno celice) klikneš **Dodaj opombo** (npr. »obvezno športna obutev«). Pri **enkratnem** dogodku se opomba zapiše kar v opis dogodka (vidna in urejiva tudi v meniju Dogodki); pri **ponavljajočem** velja samo za ta dan, serija ostane nespremenjena, v urejevalniku pa je prikazana tudi splošna opomba dogodka. Če opomba že obstaja, se gumb glasi **Uredi opombo**.
+
+### Dodajanje dogodka iz urnika
+
+V oknu celice (klik na uro v Urniku) je gumb **Dodaj dogodek**. Obrazec se odpre z otrokom iz urnika, datumom tistega dne in časom šolske ure (npr. 8:50–9:35); vse lahko spremeniš — drug otrok ali »Vsi otroci«, daljši/krajši čas, začetek 5 minut prej … Dogodek se shrani kot običajen dogodek in je viden v meniju Dogodki, Pregledu in Koledarju, kjer ga urejaš kot vse ostale.
+
+
+## Zahtevaj registracijo (prijavna stran)
+
+Superadmin v **Nastavitve → Superadmin → Zahteve za registracijo** vklopi kljukico »Prikaži »Zahtevaj registracijo« na prijavni strani« (privzeto izklopljeno). Na prijavi se nato pod gumbom »Prijavi se« pojavi povezava na obrazec (`/zahtevaj-registracijo`): ime, priimek, e-pošta.
+
+- Zahteva se shrani (tabela `registration_requests`), superadmin pa dobi e-pošto, če je kljukica »Obvesti me po e-pošti ob novi zahtevi« vklopljena (privzeto da; potrebuje nastavljen SMTP).
+- Pri vsaki zahtevi: **Pošlji vabilo** (ustvari običajno vabilo za novo skupino, veljavno 7 dni; registracijski obrazec ima ime in priimek že vnesena, e-pošta je zaklenjena), **Zavrni** ali izbris. Če SMTP ni nastavljen, se prikaže povezava za ročno pošiljanje.
+- Zaščita: skrito polje proti robotom, največ 5 zahtev na uro z istega IP, največ 50 čakajočih na uro skupaj; odgovor je vedno enak, tudi če račun ali zahteva za ta naslov že obstaja.
+- Migracija `0022_registration_requests` doda tabelo in stolpec `invitations.name`.
+
+## Manjše izboljšave (oktober 2026)
+
+- Gumb X v oknu z opombo dogodka (Pregled, Urnik) zdaj deluje (prekrivala ga je vrstica s časom).
+- V Urniku so pri »Dogodki v tem tednu« dogodki, ki so že minili, osiveli.
+
+## Otroški profil (prijava otroka)
+
+Starš v **Nastavitve → Otroci** pri dodajanju otroka obkljuka **Ustvari profil za otroka** (obvezna je e-pošta otroka) in določi geslo; pri obstoječem otroku je isto v razdelku »Prijava otroka« (ustvari profil, novo geslo, odstrani profil). Otrok se prijavi z e-pošto in geslom ter lahko geslo pozneje sam spremeni.
+
+Otrok vidi samo svoje podatke. Privzete pravice (starš jih lahko pri vsakem otroku spremeni, glej spodaj):
+
+- **Pregled**: ogled; beležke lahko označi kot opravljene.
+- **Urnik** in **Koledar**: samo ogled (brez spreminjanja predmetov, odpovedi, ur, opomb in dodajanja dogodkov).
+- **Beležke**: dodaja svoje ter jih ureja, pripenja in briše; beležk, ki jih je ustvaril starš, ne more urejati ali brisati (lahko jih označi kot opravljene).
+- **Ocene**: pregleduje, dodaja in ureja; pri brisanju samo **zaprosi** starša (ikona peščene ure), starš v Ocenah **potrdi izbris** ali **zavrne**.
+- **Nastavitve**: samo Videz, Naprava (push obvestila in namestitev) in Račun (sprememba gesla).
+- Ne vidi Avtobusa, Dogodkov, osebnih podatkov (EMŠO in davčna sta skrita), uporabnikov in ostalih nastavitev; ne prejema e-pošte, namenjene administratorjem. V zvončku in push obvestilih dobi samo obvestila o dogodkih, urniku, beležkah in ocenah.
+
+Pravice se preverjajo na strežniku: vsaka stran in akcija je privzeto zaprta za otroke (`requireUser`), odprte so le tiste z `requireViewer` in dodatnim preverjanjem lastništva. Migracija `0023_child_profiles` doda `users.child_id`, `notes.created_by` in `grades.delete_requested_at`.
+
+### Nastavljive pravice otroškega profila
+
+Pri vsakem otroku (**Nastavitve → Otroci → Prijava otroka**, tudi že ob ustvarjanju profila) starš izbere:
+
+- **Kaj otrok vidi:** Pregled, Urnik, Koledar, Avtobus (vse samo ogled; Avtobus je privzeto skrit).
+- **Beležke:** skrito / samo ogled / svoje (dodaja, ureja, briše) / vse (tudi starševe).
+- **Ocene:** skrito / samo ogled / dodaja in ureja (brisanje potrdi starš) / dodaja, ureja in briše.
+- **Nastavitve:** push obvestila in sprememba gesla (da/ne); videz je vedno na voljo.
+
+Skrite strani izginejo iz menija, neposreden vnos naslova preusmeri na prvo dovoljeno stran, pregled skrije razdelka Avtobus in Beležke, če nista dovoljena, obvestila (zvonec, push) pa vsebujejo samo vrste, ki jih otrok sme videti. Pravice so shranjene kot JSON v `users.child_perms` (migracija `0024_child_permissions`); profili brez zapisa dobijo privzete pravice. Dogodki (urejanje) otroku niso na voljo.
+
+
+## Več e-poštnih naslovov otroka
+Pri otroku je poleg primarne e-pošte (polje »E-pošta«, uporablja se tudi za prijavo otroškega profila) na voljo še polje »Dodatni e-poštni naslovi« (po en v vrstici, največ 10). Neveljavni in podvojeni naslovi se izpustijo. Modalno okno otroka prikazuje samo primarni naslov. Potrebna je migracija `0025_child_extra_emails` (zažene se sama).
+
+
+## Telefon staršev
+Administrator ima neobvezno telefonsko številko (Nastavitve → Uporabniki, pri dodajanju in urejanju; v zavihku Račun jo vidi pri svojih podatkih). Otroški profil v Nastavitve → Račun vidi razdelek »Moji starši« z imenom, e-pošto in telefonom vseh administratorjev skupine (povezave mailto/tel). Potrebna je migracija `0026_user_phone` (zažene se sama).
