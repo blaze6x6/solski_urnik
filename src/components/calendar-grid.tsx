@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Clock3, Flag, Palmtree, Pencil, Plus, Trash2, Undo2, X, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Flag, Palmtree, Pencil, Plus, StickyNote, Trash2, Undo2, X, XCircle } from "lucide-react";
+import { OccurrenceNoteEditor } from "@/components/occurrence-note-editor";
 import Link from "next/link";
 import { deleteEventAction, setOccurrenceCancelledAction, setOccurrenceTimeAction } from "@/app/actions/events";
 import { cn, eventColor } from "@/lib/colors";
@@ -32,6 +33,13 @@ export type CalCell = {
     repeat: string | null;
     range: string;
     cancelled: boolean;
+    /** opombe (opis) dogodka — null, če jih ni */
+    note: string | null;
+    location: string | null;
+    /** opomba samo za ta termin (null, če je ni) */
+    dayNote: string | null;
+    /** izvirni opis dogodka (brez opombe za ta dan) */
+    baseNote: string | null;
     /** čas tega termina je spremenjen samo za ta dan */
     timeChanged: boolean;
     startTime: string | null;
@@ -50,6 +58,7 @@ export function CalendarGrid({
   kids,
   slotsByChild,
   smtpReady,
+  readOnly = false,
 }: {
   cells: CalCell[];
   prevHref: string;
@@ -58,6 +67,8 @@ export function CalendarGrid({
   kids: KidOption[];
   slotsByChild: Record<number, SlotOption[]>;
   smtpReady: boolean;
+  /** samo ogled (otroški profil) */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const isTouch = useIsTouch();
@@ -227,6 +238,7 @@ export function CalendarGrid({
                       >
                         {e.who ? <span className="opacity-70">{e.who}: </span> : null}
                         {e.title}
+                        {e.note ? <StickyNote className="ml-1 inline h-2.5 w-2.5 -translate-y-px" strokeWidth={2.8} aria-label="Ima opombe" /> : null}
                       </p>
                     );
                   })}
@@ -320,6 +332,18 @@ export function CalendarGrid({
                           {e.repeat ? ` · ponavlja se ${e.repeat}` : ""}
                           {e.timeChanged ? " · ura spremenjena samo za ta dan" : ""}
                         </p>
+                        {e.note ? (
+                          <p
+                            className="mt-2 flex items-start gap-1.5 rounded-xl bg-white/60 px-2.5 py-2 text-[12.5px] leading-snug break-words whitespace-pre-line"
+                            style={{ color: pal.ink }}
+                          >
+                            <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
+                            <span className="min-w-0">
+                              <span className="font-bold">Opombe: </span>
+                              {e.note}
+                            </span>
+                          </p>
+                        ) : null}
                         {timeEdit?.id === e.id ? (
                           <div className="mt-2.5 rounded-xl bg-white/80 p-2.5">
                             <p className="mb-1.5 text-[11px] font-semibold text-ink-soft">Čas samo za {e.range}</p>
@@ -364,6 +388,7 @@ export function CalendarGrid({
                             </div>
                           </div>
                         ) : null}
+                        {readOnly ? null : (
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
                           <button
                             type="button"
@@ -379,7 +404,7 @@ export function CalendarGrid({
                             )}
                             {e.cancelled ? "Povrni" : "Odpade"}
                           </button>
-                          {e.recurring && !e.cancelled ? (
+                          {!e.cancelled ? (
                             <button
                               type="button"
                               disabled={busy}
@@ -393,6 +418,18 @@ export function CalendarGrid({
                               <Clock3 className="h-3.5 w-3.5" strokeWidth={2.4} />
                               Spremeni uro
                             </button>
+                          ) : null}
+                          {!e.cancelled ? (
+                            <OccurrenceNoteEditor
+                              key={`${e.id}-${e.dayNote ?? ""}-${e.baseNote ?? ""}`}
+                              eventId={e.eventId}
+                              occDate={e.occDate}
+                              recurring={e.recurring}
+                              baseNote={e.baseNote}
+                              dayNote={e.dayNote}
+                              dateLabel={e.range}
+                              variant="chip"
+                            />
                           ) : null}
                           {e.timeChanged ? (
                             <button
@@ -423,13 +460,14 @@ export function CalendarGrid({
                             Izbriši
                           </button>
                         </div>
+                        )}
                       </li>
                     );
                   })}
                 </ul>
               )}
 
-                {kids.length > 0 ? (
+                {readOnly ? null : kids.length > 0 ? (
                   <button onClick={() => setAdding(true)} className="btn btn-primary mt-4 w-full">
                     <Plus className="h-4 w-4" strokeWidth={2.6} />
                     Dodaj dogodek

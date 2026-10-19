@@ -196,7 +196,7 @@ export async function sendDigestToUser(user: User): Promise<number> {
 
 export async function sendDigestToAllUsers(): Promise<number> {
   if (!smtpConfigured()) throw new Error("SMTP ni nastavljen (manjka SMTP_HOST).");
-  const all = await db.select().from(users);
+  const all = (await db.select().from(users)).filter((u) => u.childId === null);
   let sent = 0;
   for (const u of all) {
     try {

@@ -136,6 +136,8 @@ export async function buildChildWeek(
           cancelled: h.cancelled,
           recurring: isRecurring(h.event.recurrence),
           timeChanged: Boolean(h.timeChanged),
+          dayNote: h.dayNote ?? null,
+          baseNote: h.baseNote?.trim() || null,
           startTime: h.event.startTime,
           endTime: h.event.endTime,
           note: h.event.description?.trim() || null,
@@ -151,6 +153,7 @@ export async function buildChildWeek(
     title: o.event.title,
     color: o.event.color,
     cancelled: o.cancelled,
+    endDate: o.endDate,
     range:
       o.endDate !== o.startDate
         ? `${formatDayMonthSI(o.startDate)} – ${formatDayMonthSI(o.endDate)}`
@@ -158,6 +161,7 @@ export async function buildChildWeek(
     time: timeLabel(o.event),
     repeat: isRecurring(o.event.recurrence) ? recurrenceLabel(o.event.recurrence) : null,
     note: o.event.description?.trim() || null,
+    location: o.event.location || null,
   }));
 
   return { slots, days, cells, dates, weekLabel, occurrences: occs, eventChips };

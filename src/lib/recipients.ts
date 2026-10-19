@@ -42,8 +42,10 @@ function wants(
  */
 export async function recipientsFor(kind: NotifyKind, scopeId: number | null): Promise<Recipient[]> {
   const allUsers = await db.select().from(users);
-  const members =
-    scopeId === null ? allUsers : allUsers.filter((u) => (u.householdId ?? u.id) === scopeId);
+  // otroški profili ne prejemajo e-poštnih obvestil (vsa so namenjena administratorjem)
+  const members = (
+    scopeId === null ? allUsers : allUsers.filter((u) => (u.householdId ?? u.id) === scopeId)
+  ).filter((u) => u.childId === null);
   const pool = members.length ? members : allUsers;
 
   const out = new Map<string, Recipient>();

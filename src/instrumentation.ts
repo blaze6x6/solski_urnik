@@ -44,6 +44,9 @@ function scheduleReminders() {
       const { processDueReminders } = await import("@/lib/event-mail");
       const sent = await processDueReminders();
       if (sent > 0) console.log(`[opomniki] poslanih: ${sent}`);
+      const { completeExpiredNotes } = await import("@/lib/data");
+      const closed = await completeExpiredNotes(true);
+      if (closed > 0) console.log(`[beležke] samodejno opravljenih po poteku roka: ${closed}`);
       const { processNoteReminders } = await import("@/lib/note-mail");
       const notesSent = await processNoteReminders();
       if (notesSent > 0) console.log(`[opomniki] beležk: ${notesSent}`);

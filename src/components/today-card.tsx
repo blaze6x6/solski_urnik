@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EventNoteModal, type EventNoteData } from "@/components/event-note-modal";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,6 +13,7 @@ import {
   Flag,
   NotebookPen,
   Palmtree,
+  StickyNote,
 } from "lucide-react";
 import { toggleNoteDoneAction } from "@/app/actions/notes";
 import { cn, eventColor, subjectColor } from "@/lib/colors";
@@ -43,6 +45,9 @@ export type DayEventItem = {
   color: string;
   allDay: boolean;
   cancelled: boolean;
+  /** opombe (opis) dogodka — null, če jih ni */
+  note: string | null;
+  location: string | null;
 };
 
 export type NoteItem = {
@@ -66,6 +71,10 @@ type Props = {
   busFrom: BusItem[];
   eventsToday: DayEventItem[];
   notes?: NoteItem[];
+  /** gumb »Opravljeno« pri beležkah (otroški profil ga lahko nima) */
+  canToggleNotes?: boolean;
+  /** razdelek »Avtobus danes« (otroški profil ga lahko nima) */
+  showBus?: boolean;
 };
 
 export function TodayCard({
@@ -79,8 +88,11 @@ export function TodayCard({
   busFrom,
   eventsToday,
   notes = [],
+  canToggleNotes = true,
+  showBus = true,
 }: Props) {
   const [now, setNow] = useState<Date | null>(null);
+  const [noteView, setNoteView] = useState<EventNoteData | null>(null);
 
   useEffect(() => {
     setNow(new Date());
@@ -143,7 +155,7 @@ export function TodayCard({
         </Link>
       </div>
 
-      <NotesStrip childId={child.id} notes={notes} />
+      <NotesStrip childId={child.id} notes={notes} canToggle={canToggleNotes} />
 
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-0 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         {/* Današnji pouk */}
@@ -280,6 +292,7 @@ export function TodayCard({
 
         {/* Avtobus + dogodki */}
         <div className="flex min-w-0 flex-col">
+          {showBus ? (
           <div className="border-b border-line px-5 py-4">
             <p className="mb-3 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
               <BusFront className="h-3.5 w-3.5" strokeWidth={2.4} />
@@ -324,11 +337,18 @@ export function TodayCard({
               </div>
             )}
           </div>
+          ) : null}
 
           <div className="flex-1 px-5 py-4">
             <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
               <CalendarDays className="h-3.5 w-3.5" strokeWidth={2.4} />
               Dogodki ta dan
+              {eventsToday.some((e) => e.note) ? (
+                <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[10px] font-bold tracking-normal text-amber-strong normal-case">
+                  <StickyNote className="h-3 w-3" strokeWidth={2.4} />
+                  Opombe: {eventsToday.filter((e) => e.note).length}
+                </span>
+              ) : null}
             </p>
             {eventsToday.length === 0 ? (
               <p className="text-xs text-ink-faint">Danes ni dogodkov.</p>
@@ -338,18 +358,46 @@ export function TodayCard({
                   const pal = e.cancelled
                     ? { soft: "#eceff2", ink: "#6b7480", solid: "#b4bcc5" }
                     : eventColor(e.color);
-                  return (
-                    <li
-                      key={e.id}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium"
-                      style={{ background: pal.soft, color: pal.ink }}
-                    >
+                  const inner = (
+                    <>
                       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: pal.solid }} />
-                      <span className={cn("min-w-0 flex-1 truncate", e.cancelled && "line-through")}>{e.title}</span>
+                      <span className={cn("min-w-0 flex-1 truncate text-left", e.cancelled && "line-through")}>{e.title}</span>
+                      {e.note ? <StickyNote className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} aria-label="Ima opombe" /> : null}
                       {e.cancelled ? (
                         <span className="shrink-0 text-[10px] font-bold tracking-wide uppercase">Odpade</span>
                       ) : null}
                       <span className="shrink-0 text-[10px] font-bold opacity-70">{e.timeText}</span>
+                    </>
+                  );
+                  return (
+                    <li key={e.id}>
+                      {e.note ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNoteView({
+                              title: e.title,
+                              color: e.color,
+                              cancelled: e.cancelled,
+                              when: e.timeText,
+                              location: e.location,
+                              note: e.note as string,
+                            })
+                          }
+                          className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-[filter] hover:brightness-95"
+                          style={{ background: pal.soft, color: pal.ink }}
+                          title="Odpri opombe"
+                        >
+                          {inner}
+                        </button>
+                      ) : (
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium"
+                          style={{ background: pal.soft, color: pal.ink }}
+                        >
+                          {inner}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -358,13 +406,14 @@ export function TodayCard({
           </div>
         </div>
       </div>
+      {noteView ? <EventNoteModal data={noteView} onClose={() => setNoteView(null)} /> : null}
     </section>
   );
 }
 
 
 /** Odprte beležke otroka nad današnjim urnikom: nujne (rok se bliža) so vedno vidne, ostale so zložene. */
-function NotesStrip({ childId, notes }: { childId: number; notes: NoteItem[] }) {
+function NotesStrip({ childId, notes, canToggle }: { childId: number; notes: NoteItem[]; canToggle: boolean }) {
   if (notes.length === 0) return null;
   const urgent = notes.filter((n) => n.urgent);
   const rest = notes.filter((n) => !n.urgent);
@@ -396,6 +445,7 @@ function NotesStrip({ childId, notes }: { childId: number; notes: NoteItem[] }) 
           </span>
         ) : null}
       </span>
+      {canToggle ? (
       <form action={toggleNoteDoneAction} className="shrink-0">
         <input type="hidden" name="id" value={n.id} />
         <input type="hidden" name="childId" value={childId} />
@@ -404,6 +454,7 @@ function NotesStrip({ childId, notes }: { childId: number; notes: NoteItem[] }) 
           Opravljeno
         </button>
       </form>
+      ) : null}
     </li>
   );
 

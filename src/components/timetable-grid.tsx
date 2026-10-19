@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
+  CalendarPlus,
   CalendarOff,
   CaseSensitive,
   Check,
@@ -24,6 +25,9 @@ import { cn, eventColor, subjectColor } from "@/lib/colors";
 import { findNowSlot, toISO } from "@/lib/time";
 import { setEntryAction, setLessonCancelledAction } from "@/app/actions/timetable";
 import { setOccurrenceCancelledAction, setOccurrenceTimeAction } from "@/app/actions/events";
+import { EventNoteModal, type EventNoteData } from "@/components/event-note-modal";
+import { OccurrenceNoteEditor } from "@/components/occurrence-note-editor";
+import { EventForm, type KidOption, type SlotOption } from "@/components/event-form";
 import { loadChildWeekAction } from "@/app/actions/week";
 import { PdfMenu, type PdfStyle } from "@/components/pdf-menu";
 import { exportTimetablePdf, type PdfPayload } from "@/lib/pdf";
@@ -50,6 +54,9 @@ export type GridEvent = {
   cancelled: boolean;
   /** ponavljajoč dogodek (čas je mogoče spremeniti samo za en termin) */
   recurring: boolean;
+  /** opomba samo za ta termin (null, če je ni) */
+  dayNote: string | null;
+  baseNote: string | null;
   /** čas tega termina je spremenjen samo za ta dan */
   timeChanged: boolean;
   startTime: string | null;
@@ -93,11 +100,14 @@ export type WeekEventChip = {
   title: string;
   color: string;
   cancelled: boolean;
+  /** zadnji dan dogodka (YYYY-MM-DD) — za sivo barvo že potekle */
+  endDate: string;
   range: string;
   time: string;
   repeat: string | null;
   /** opombe (opis) dogodka — null, če jih ni */
   note: string | null;
+  location?: string | null;
 };
 
 /** Vsi podatki enega prikazanega tedna. */
@@ -133,6 +143,12 @@ type Props = {
    * Uporabno pri prikazu vseh urnikov hkrati.
    */
   independent?: boolean;
+  /** vsi otroci skupine (za obrazec »Dodaj dogodek« iz urnika) */
+  eventKids?: KidOption[];
+  slotsByChild?: Record<number, SlotOption[]>;
+  smtpReady?: boolean;
+  /** samo ogled (otroški profil): brez urejanja predmetov, odpovedi, časa, opomb in dodajanja dogodkov */
+  readOnly?: boolean;
 };
 
 export function TimetableGrid({
@@ -150,6 +166,10 @@ export function TimetableGrid({
   nextHref,
   todayHref,
   independent = false,
+  eventKids = [],
+  slotsByChild = {},
+  smtpReady = false,
+  readOnly = false,
 }: Props) {
   const compactToolbar = independent;
   const router = useRouter();
@@ -177,7 +197,9 @@ export function TimetableGrid({
   const [now, setNow] = useState<Date | null>(null);
   const [detail, setDetail] = useState<{ wd: number; slotId: number } | null>(null);
   const [picking, setPicking] = useState(false);
+  const [addingEvent, setAddingEvent] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [noteView, setNoteView] = useState<EventNoteData | null>(null);
   const [cancelPending, startCancelTransition] = useTransition();
   const [, startTransition] = useTransition();
 
@@ -220,6 +242,10 @@ export function TimetableGrid({
     const id = setInterval(() => setNow(new Date()), 20_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!detail) setAddingEvent(false);
+  }, [detail]);
 
   // zapiranje modala s tipko Esc
   useEffect(() => {
@@ -557,18 +583,22 @@ export function TimetableGrid({
           <p className="mb-3 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-ink-faint uppercase">
             <CalendarDays className="h-3.5 w-3.5" strokeWidth={2.4} />
             Dogodki v tem tednu
+            {eventChips.some((o) => o.note) ? (
+              <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[10px] font-bold tracking-normal text-amber-strong normal-case">
+                <StickyNote className="h-3 w-3" strokeWidth={2.4} />
+                Opombe: {eventChips.filter((o) => o.note).length}
+              </span>
+            ) : null}
           </p>
           <div className="flex flex-wrap gap-2">
             {eventChips.map((o) => {
-              const pal = o.cancelled
+              // dogodek, ki je že minil (zadnji dan pred današnjim), je osivel
+              const past = todayIso !== null && o.endDate < todayIso;
+              const pal = o.cancelled || past
                 ? { soft: "#eceff2", ink: "#6b7480", solid: "#b4bcc5" }
                 : eventColor(o.color);
-              return (
-                <span
-                  key={o.key}
-                  className="chip px-3 py-1.5 text-[11.5px]"
-                  style={{ background: pal.soft, color: pal.ink }}
-                >
+              const body = (
+                <>
                   <span className="h-2 w-2 rounded-full" style={{ background: pal.solid }} />
                   <span className={o.cancelled ? "line-through" : undefined}>{o.title}</span>
                   {o.cancelled ? <strong className="text-[10px] tracking-wide uppercase">Odpade</strong> : null}
@@ -578,18 +608,45 @@ export function TimetableGrid({
                     {o.time}
                     {o.repeat ? ` · ${o.repeat}` : ""}
                   </span>
-                  {o.note ? (
-                    <span className="flex max-w-[260px] items-center gap-1 truncate font-medium italic opacity-80" title={o.note}>
-                      <StickyNote className="h-3 w-3 shrink-0" strokeWidth={2.4} />
-                      <span className="truncate">{o.note}</span>
-                    </span>
-                  ) : null}
+                  {o.note ? <StickyNote className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} aria-label="Ima opombe" /> : null}
+                </>
+              );
+              return o.note ? (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() =>
+                    setNoteView({
+                      title: o.title,
+                      color: o.color,
+                      cancelled: o.cancelled,
+                      when: `${o.range} · ${o.time}`,
+                      location: o.location ?? null,
+                      note: o.note as string,
+                    })
+                  }
+                  className={cn("chip cursor-pointer px-3 py-1.5 text-[11.5px] transition-[filter] hover:brightness-95", past && !o.cancelled && "opacity-75")}
+                  style={{ background: pal.soft, color: pal.ink }}
+                  title={past ? "Že minilo · odpri opombe" : "Odpri opombe"}
+                >
+                  {body}
+                </button>
+              ) : (
+                <span
+                  key={o.key}
+                  className={cn("chip px-3 py-1.5 text-[11.5px]", past && !o.cancelled && "opacity-75")}
+                  style={{ background: pal.soft, color: pal.ink }}
+                  title={past ? "Že minilo" : undefined}
+                >
+                  {body}
                 </span>
               );
             })}
           </div>
         </div>
       ) : null}
+
+      {noteView ? <EventNoteModal data={noteView} onClose={() => setNoteView(null)} /> : null}
 
       {/* ----------------------- MODALNO OKNO ----------------------- */}
       {detail && detailDay && detailSlot ? (
@@ -615,7 +672,25 @@ export function TimetableGrid({
             />
 
             <div className="max-h-[52vh] overflow-y-auto px-5 pb-5">
-              {!picking ? (
+              {addingEvent ? (
+                <EventForm
+                  key={`${childId}-${detailDay.iso}-${detailSlot.id}`}
+                  kids={eventKids}
+                  slotsByChild={slotsByChild}
+                  initial={null}
+                  smtpReady={smtpReady}
+                  defaultDate={detailDay.iso}
+                  defaultChildId={childId}
+                  defaultStart={detailSlot.start}
+                  defaultEnd={detailSlot.end}
+                  onCancel={() => setAddingEvent(false)}
+                  onSaved={async () => {
+                    setAddingEvent(false);
+                    await refreshLocal();
+                    router.refresh();
+                  }}
+                />
+              ) : !picking ? (
                 <>
                   <div className="space-y-3">
                     <InfoRow label="Vrstica" value={`${detailSlot.title}${detailSlot.kind === "break" ? " (odmor)" : ""}`} />
@@ -639,7 +714,7 @@ export function TimetableGrid({
                             <p className="mt-0.5 text-[15px] font-semibold line-through">{detailCell.subject.name}</p>
                           </div>
                         ) : null}
-                        {detailSlot.kind === "lesson" ? (
+                        {!readOnly && detailSlot.kind === "lesson" ? (
                           <button
                             disabled={cancelPending}
                             onClick={() => toggleLessonCancelled(detailSlot.id, detailDay.iso, !detailCell.subjectCancelled)}
@@ -653,7 +728,7 @@ export function TimetableGrid({
                             {cancelPending ? "Shranjujem …" : detailCell.subjectCancelled ? "Povrni uro" : "Ura odpade"}
                           </button>
                         ) : null}
-                        <p className="text-center text-[11px] text-ink-faint">
+                        <p className={cn("text-center text-[11px] text-ink-faint", readOnly && "hidden")}>
                           »Ura odpade« velja samo za {detailDay.dateLabel} — ostali tedni ostanejo nespremenjeni.
                         </p>
                       </>
@@ -698,6 +773,8 @@ export function TimetableGrid({
                               {ev.note ? <EventNote note={ev.note} ink={pal.ink} /> : null}
                             </div>
                           )}
+                          {!readOnly ? (
+                          <>
                           <button
                             disabled={cancelPending}
                             onClick={() => toggleCancelled(ev.id, ev.occDate, !ev.cancelled)}
@@ -710,7 +787,7 @@ export function TimetableGrid({
                             )}
                             {cancelPending ? "Shranjujem …" : ev.cancelled ? "Povrni dogodek" : "Dogodek odpade"}
                           </button>
-                          {ev.recurring && !ev.cancelled ? (
+                          {!ev.cancelled ? (
                             timeEdit?.key === `${ev.id}-${ev.occDate}` ? (
                               <div className="mt-2 rounded-2xl border border-line bg-white p-3">
                                 <p className="mb-1.5 text-[11px] font-semibold text-ink-soft">
@@ -780,10 +857,25 @@ export function TimetableGrid({
                               </div>
                             )
                           ) : null}
+                          {!ev.cancelled ? (
+                            <OccurrenceNoteEditor
+                              key={`${ev.id}-${ev.occDate}-${ev.dayNote ?? ""}-${ev.baseNote ?? ""}`}
+                              eventId={ev.id}
+                              occDate={ev.occDate}
+                              recurring={ev.recurring}
+                              baseNote={ev.baseNote}
+                              dayNote={ev.dayNote}
+                              dateLabel={detailDay.dateLabel}
+                              variant="block"
+                              onDone={refreshLocal}
+                            />
+                          ) : null}
+                          </>
+                          ) : null}
                         </div>
                       );
                     })}
-                    {detailCell && detailCell.events.length > 0 ? (
+                    {!readOnly && detailCell && detailCell.events.length > 0 ? (
                       <p className="text-center text-[11px] text-ink-faint">
                         »Dogodek odpade« in »Spremeni uro« veljata samo za ta termin — ostale ponovitve ostanejo.
                       </p>
@@ -801,9 +893,18 @@ export function TimetableGrid({
                     ) : null}
                   </div>
 
-                  {detailSlot.kind === "lesson" ? (
+                  {!readOnly && detailSlot.kind === "lesson" ? (
                     <button onClick={() => setPicking(true)} className="btn btn-primary mt-5 w-full">
                       {detailCell?.subject ? "Spremeni predmet" : "Dodaj predmet"}
+                    </button>
+                  ) : null}
+                  {!readOnly && eventKids.length > 0 ? (
+                    <button
+                      onClick={() => setAddingEvent(true)}
+                      className={cn("btn btn-ghost w-full", detailSlot.kind === "lesson" ? "mt-2" : "mt-5")}
+                    >
+                      <CalendarPlus className="h-4 w-4" strokeWidth={2.4} />
+                      Dodaj dogodek
                     </button>
                   ) : null}
                 </>

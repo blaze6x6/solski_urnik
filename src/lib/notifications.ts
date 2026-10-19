@@ -6,10 +6,11 @@
 // je shranjeno pri vsakem uporabniku posebej.
 // ---------------------------------------------------------------------------
 
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationStates, notifications } from "@/db/schema";
 import { currentDeviceId, pushToScope } from "@/lib/push";
+import { notifAllowed } from "@/lib/child-permissions";
 
 export type NotifKind =
   | "event"
@@ -72,6 +73,8 @@ export async function notifyScope(
       "changes",
       { title: "Šolski urnik", body: `${actor.name}: ${text}`, url: PUSH_URL[kind] ?? "/", tag: `notif-${row.id}` },
       ownDevice,
+      // otroški profili dobijo samo obvestila, ki jim jih pravice dovoljujejo
+      (perms) => notifAllowed(perms, kind),
     );
   } catch (err) {
     console.error("[obvestila] zapis ni uspel:", err);
@@ -91,7 +94,10 @@ export async function listNotifications(
   userId: number,
   scope: number,
   limit = 50,
+  /** otroški profil: samo ta obvestila (glede na njegove pravice); administrator: vsa */
+  onlyKinds?: string[],
 ): Promise<NotificationItem[]> {
+  if (onlyKinds && onlyKinds.length === 0) return [];
   try {
     const rows = await db
       .select({ n: notifications, readBy: notificationStates.userId })
@@ -103,6 +109,7 @@ export async function listNotifications(
       .where(
         and(
           eq(notifications.scopeId, scope),
+          ...(onlyKinds ? [inArray(notifications.kind, onlyKinds)] : []),
           or(isNull(notificationStates.userId), eq(notificationStates.hidden, false)),
         ),
       )

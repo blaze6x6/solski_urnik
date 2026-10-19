@@ -32,6 +32,15 @@ export const users = pgTable("users", {
    * null = uporabnik je lastnik svoje skupine (uporabi se njegov id).
    */
   householdId: integer("household_id"),
+  /**
+   * Otroški profil: id otroka, katerega podatke uporabnik vidi. Takšen uporabnik je član
+   * skupine, a ima omejene pravice (glej lib/auth.ts). null = običajen administrator.
+   */
+  childId: integer("child_id"),
+  /** pravice otroškega profila (JSON, glej lib/child-permissions.ts); null = privzete */
+  childPerms: text("child_perms"),
+  /** telefonska številka (neobvezno); otroški profili vidijo kontakte staršev */
+  phone: text("phone").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -45,6 +54,8 @@ export const invitations = pgTable("invitations", {
   /** SHA-256 žetona iz povezave (žeton sam se ne hrani) */
   tokenHash: text("token_hash").notNull().unique(),
   email: text("email").notNull(),
+  /** ime in priimek iz zahteve za registracijo (za vnaprej izpolnjen obrazec); sicer null */
+  name: text("name"),
   scopeId: integer("scope_id"),
   invitedBy: integer("invited_by")
     .notNull()
@@ -56,12 +67,28 @@ export const invitations = pgTable("invitations", {
 
 export type Invitation = typeof invitations.$inferSelect;
 
+/** Zahteve za registracijo s prijavne strani (obravnava jih superadmin). */
+export const registrationRequests = pgTable("registration_requests", {
+  id: serial("id").primaryKey(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  /** pending | invited | rejected */
+  status: text("status").notNull().default("pending"),
+  /** IP pošiljatelja (samo za omejevanje zlorab) */
+  ip: text("ip").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type RegistrationRequest = typeof registrationRequests.$inferSelect;
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at").notNull(),
+  /** superadmin, ki je odprl to sejo »kot« drug uporabnik (null = običajna seja) */
+  impersonatorId: integer("impersonator_id").references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -86,6 +113,8 @@ export const children = pgTable("children", {
   taxNumber: text("tax_number").notNull().default(""),
   phone: text("phone").notNull().default(""),
   email: text("email").notNull().default(""),
+  /** dodatni e-poštni naslovi otroka (po en na vrstico); `email` je primarni */
+  extraEmails: text("extra_emails").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -291,6 +320,25 @@ export const eventTimeOverrides = pgTable(
 );
 
 /**
+ * Opomba samo za eno ponovitev ponavljajočega dogodka (npr. »obvezno športna
+ * obutev«). Opis dogodka in ostale ponovitve ostanejo nespremenjeni.
+ */
+export const eventOccurrenceNotes = pgTable(
+  "event_occurrence_notes",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** začetni datum konkretne ponovitve dogodka */
+    occurrenceDate: date("occurrence_date", { mode: "string" }).notNull(),
+    note: text("note").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("event_occ_note_once").on(t.eventId, t.occurrenceDate)],
+);
+
+/**
  * Odpadle ure pouka (npr. učitelj je odsoten): predmet ostane v urniku,
  * ta konkretni datum pa je prečrtan in označen z »Odpade«.
  */
@@ -422,8 +470,12 @@ export const notes = pgTable("notes", {
   /** opravljeno — beležka se ne prikazuje več na pregledu in ne sproži opomnika */
   done: boolean("done").notNull().default(false),
   doneAt: timestamp("done_at"),
+  /** ročno ponovno odprta po poteku roka — samodejno zaključevanje je preskočeno */
+  keepOpen: boolean("keep_open").notNull().default(false),
   /** rok, za katerega je bil opomnik že poslan (sprememba roka sproži nov opomnik) */
   reminderSentFor: date("reminder_sent_for", { mode: "string" }),
+  /** uporabnik, ki je beležko ustvaril (otrok sme urejati samo svoje); null = starejša beležka */
+  createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -439,6 +491,8 @@ export const grades = pgTable("grades", {
   gradeDate: date("grade_date", { mode: "string" }).notNull(),
   type: text("type").notNull().default("pisni izpit"),
   note: text("note").notNull().default(""),
+  /** otrok je zaprosil za izbris ocene; izbriše jo lahko samo starš (potrdi ali zavrne) */
+  deleteRequestedAt: timestamp("delete_requested_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

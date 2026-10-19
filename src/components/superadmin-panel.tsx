@@ -1,13 +1,16 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Check, CircleAlert, CircleCheck, Copy, KeyRound, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { Check, CircleAlert, CircleCheck, Copy, Eye, KeyRound, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { startImpersonationAction } from "@/app/actions/impersonate";
 import { createGroupAction, superDeleteUserAction, superResetPasswordAction, type TempPasswordState, type UserFormState } from "@/app/actions/users";
 import type { HouseholdOverview } from "@/lib/data";
 import { DOGODEK, OTROK, UPORABNIK, count } from "@/lib/plural";
 import { createGroupInviteAction } from "@/app/actions/invites";
 import { InviteForm } from "@/components/invite-forms";
 import type { PendingInvite } from "@/lib/invites";
+import { RegistrationAdmin } from "@/components/registration-forms";
+import type { RegistrationRequestView } from "@/lib/registration";
 
 function DeleteButton({
   id,
@@ -134,10 +137,12 @@ export function SuperadminPanel({
   households,
   selfId,
   invites,
+  registration,
 }: {
   households: HouseholdOverview[];
   selfId: number;
   invites: PendingInvite[];
+  registration: { enabled: boolean; notify: boolean; smtpReady: boolean; requests: RegistrationRequestView[] };
 }) {
   return (
     <div className="space-y-5">
@@ -164,6 +169,8 @@ export function SuperadminPanel({
         />
         <CreateGroupForm />
       </div>
+
+      <RegistrationAdmin {...registration} />
 
       {households.map((h) => {
         const owner = h.people.find((p) => p.isOwner) ?? h.people[0];
@@ -203,6 +210,20 @@ export function SuperadminPanel({
                       </p>
                       <p className="truncate text-xs text-ink-faint">{p.email}</p>
                     </div>
+                    {isSelf || p.isSuperadmin ? null : (
+                      <form
+                        action={startImpersonationAction}
+                        onSubmit={(e) => {
+                          if (!window.confirm(`Odprem aplikacijo kot ${p.name}? Videli boste njegove podatke (otroke, urnike, dogodke). Seja velja 2 uri, spremembe se zapišejo v njegov račun.`)) e.preventDefault();
+                        }}
+                      >
+                        <input type="hidden" name="id" value={p.id} />
+                        <button className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                          <Eye className="h-3.5 w-3.5" strokeWidth={2.4} />
+                          Odpri kot
+                        </button>
+                      </form>
+                    )}
                     {isSelf ? null : <ResetPasswordButton id={p.id} name={p.name} />}
                     {blocked ? null : (
                       <DeleteButton

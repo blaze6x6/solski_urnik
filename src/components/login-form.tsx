@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CircleAlert, CircleCheck, LogIn } from "lucide-react";
 import { loginAction, type AuthState } from "@/app/actions/auth";
 
-export function LoginForm({ resetDone = false }: { resetDone?: boolean }) {
+export function LoginForm({ resetDone = false, canRequest = false }: { resetDone?: boolean; canRequest?: boolean }) {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(loginAction, undefined);
 
   return (
@@ -63,6 +63,15 @@ export function LoginForm({ resetDone = false }: { resetDone?: boolean }) {
         <LogIn className="h-4 w-4" strokeWidth={2.2} />
         {pending ? "Prijavljam …" : "Prijavi se"}
       </button>
+
+      {canRequest ? (
+        <p className="text-center text-sm text-ink-soft">
+          Še nimate računa?{" "}
+          <Link href="/zahtevaj-registracijo" className="font-semibold text-spruce hover:underline">
+            Zahtevaj registracijo
+          </Link>
+        </p>
+      ) : null}
     </form>
   );
 }

@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings, pushSubscriptions, users, type PushSubscriptionRow } from "@/db/schema";
+import { parseChildPerms, type ChildPerms } from "@/lib/child-permissions";
 import { b64u, buildVapidHeader, encryptPayload, fromB64u } from "@/lib/webpush-crypto";
 
 export type PushKind = "reminders" | "changes";
@@ -133,10 +134,20 @@ export async function pushToScope(
   payload: PushPayload,
   /** naprava (id naročnine), ki je spremembo naredila — nanjo ne pošljemo */
   excludeSubscriptionId?: number,
+  /** ali obvestilo dobi otroški profil z danimi pravicami (privzeto da) */
+  childFilter: (perms: ChildPerms) => boolean = () => true,
 ): Promise<number> {
   try {
-    const members = await db.select({ id: users.id, householdId: users.householdId }).from(users);
-    const ids = members.filter((u) => (u.householdId ?? u.id) === scopeId).map((u) => u.id);
+    const members = await db
+      .select({ id: users.id, householdId: users.householdId, childId: users.childId, childPerms: users.childPerms })
+      .from(users);
+    const ids = members
+      .filter(
+        (u) =>
+          (u.householdId ?? u.id) === scopeId &&
+          (u.childId === null || childFilter(parseChildPerms(u.childPerms))),
+      )
+      .map((u) => u.id);
     if (ids.length === 0) return 0;
     const subs = await db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.userId, ids));
     const targets = subs.filter((s) => s.kinds.split(",").includes(kind) && s.id !== excludeSubscriptionId);

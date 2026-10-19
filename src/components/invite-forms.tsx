@@ -125,7 +125,7 @@ export function InviteForm({
 }
 
 /** Registracijski obrazec na strani /vabilo. */
-export function AcceptInviteForm({ token, email }: { token: string; email: string }) {
+export function AcceptInviteForm({ token, email, defaultName = "" }: { token: string; email: string; defaultName?: string }) {
   const [state, formAction, pending] = useActionState<AcceptState, FormData>(acceptInviteAction, undefined);
   return (
     <form action={formAction} className="mt-8 space-y-5">
@@ -142,7 +142,7 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
       </div>
       <div>
         <label htmlFor="av-name" className="label">Ime in priimek</label>
-        <input id="av-name" name="name" required autoComplete="name" className="input" placeholder="npr. Nina Novak" />
+        <input id="av-name" name="name" required autoComplete="name" className="input" placeholder="npr. Nina Novak" defaultValue={defaultName} />
       </div>
       <div>
         <label htmlFor="av-pass" className="label">Geslo</label>

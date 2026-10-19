@@ -8,6 +8,7 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { invitations, users, type Invitation } from "@/db/schema";
 import { escHtml } from "@/lib/text";
+import { sendMail, smtpConfigured } from "@/lib/email";
 
 export const INVITE_TTL_DAYS = 7;
 
@@ -26,6 +27,8 @@ export async function createInvite(opts: {
   email: string;
   scopeId: number | null;
   invitedBy: number;
+  /** ime in priimek (npr. iz zahteve za registracijo) za vnaprej izpolnjen obrazec */
+  name?: string | null;
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
@@ -40,6 +43,7 @@ export async function createInvite(opts: {
   await db.insert(invitations).values({
     tokenHash: hashInviteToken(token),
     email: opts.email,
+    name: opts.name?.trim() || null,
     scopeId: opts.scopeId,
     invitedBy: opts.invitedBy,
     expiresAt,
@@ -101,4 +105,46 @@ export function inviteMailHtml(opts: {
     <p style="color:#6b7280;font-size:13px">Povezava velja ${INVITE_TTL_DAYS} dni in jo je mogoče uporabiti samo enkrat. Če vabila niste pričakovali, tega sporočila preprosto prezrite.</p>
     <p style="color:#9ca3af;font-size:12px;word-break:break-all">Če gumb ne deluje, odprite: ${opts.link}</p>
   </div>`;
+}
+
+export type InviteResult = { error?: string; ok?: string; link?: string } | undefined;
+
+/** Ustvari vabilo in ga pošlje po e-pošti (če SMTP ni nastavljen, vrne povezavo za ročno pošiljanje). */
+export async function deliverInvite(opts: {
+  email: string;
+  name?: string | null;
+  scopeId: number | null;
+  inviter: { id: number; name: string };
+  groupOwnerName?: string;
+}): Promise<InviteResult> {
+  const { token } = await createInvite({
+    email: opts.email,
+    name: opts.name,
+    scopeId: opts.scopeId,
+    invitedBy: opts.inviter.id,
+  });
+  const link = `${await appOrigin()}/vabilo?token=${token}`;
+
+  if (!smtpConfigured()) {
+    return {
+      ok: `Vabilo je ustvarjeno, a pošiljanje e-pošte na strežniku ni nastavljeno. Povezavo pošljite ročno (velja ${INVITE_TTL_DAYS} dni).`,
+      link,
+    };
+  }
+  try {
+    await sendMail(
+      opts.email,
+      opts.scopeId === null ? "Vabilo v Šolski urnik" : "Vabilo v skupino — Šolski urnik",
+      inviteMailHtml({
+        link,
+        inviterName: opts.inviter.name,
+        newGroup: opts.scopeId === null,
+        groupOwnerName: opts.groupOwnerName,
+      }),
+    );
+  } catch (err) {
+    console.error("[vabilo] pošiljanje ni uspelo:", err);
+    return { error: "Pošiljanje e-pošte ni uspelo. Povezavo lahko pošljete ročno.", link };
+  }
+  return { ok: `Vabilo je poslano na ${opts.email}.`, link };
 }

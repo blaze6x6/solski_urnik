@@ -38,6 +38,9 @@ export function EventForm({
   initial,
   smtpReady,
   defaultDate,
+  defaultChildId,
+  defaultStart,
+  defaultEnd,
   onSaved,
   onCancel,
 }: {
@@ -47,6 +50,11 @@ export function EventForm({
   smtpReady: boolean;
   /** privzeti datum začetka pri novem dogodku (npr. dan, tapnjen v koledarju) */
   defaultDate?: string;
+  /** privzeti otrok pri novem dogodku (npr. otrok iz urnika) */
+  defaultChildId?: number;
+  /** privzeti ročni čas pri novem dogodku (npr. začetek/konec šolske ure) */
+  defaultStart?: string;
+  defaultEnd?: string;
   /** če je podan, obrazec ostane na strani in po shranitvi pokliče to funkcijo */
   onSaved?: () => void;
   /** gumb »Prekliči« (npr. v modalnem oknu) */
@@ -55,7 +63,13 @@ export function EventForm({
   const embedded = Boolean(onSaved);
   const [saving, startSaving] = useTransition();
   const [childSel, setChildSel] = useState(
-    initial?.childId ? String(initial.childId) : kids[0] ? String(kids[0].id) : "all",
+    initial?.childId
+      ? String(initial.childId)
+      : defaultChildId && kids.some((k) => k.id === defaultChildId)
+        ? String(defaultChildId)
+        : kids[0]
+          ? String(kids[0].id)
+          : "all",
   );
   const [timeMode, setTimeMode] = useState<TimeMode>(
     initial ? (initial.allDay ? "allday" : initial.slotId !== null ? "slot" : "manual") : "manual",
@@ -182,11 +196,11 @@ export function EventForm({
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <label className="label" htmlFor="startTime">Od</label>
-              <input id="startTime" name="startTime" type="time" required className="input tabular-nums" defaultValue={initial?.startTime ?? "16:00"} />
+              <input id="startTime" name="startTime" type="time" required className="input tabular-nums" defaultValue={initial?.startTime ?? defaultStart ?? "16:00"} />
             </div>
             <div>
               <label className="label" htmlFor="endTime">Do</label>
-              <input id="endTime" name="endTime" type="time" className="input tabular-nums" defaultValue={initial?.endTime ?? ""} />
+              <input id="endTime" name="endTime" type="time" className="input tabular-nums" defaultValue={initial?.endTime ?? defaultEnd ?? ""} />
             </div>
           </div>
         ) : null}

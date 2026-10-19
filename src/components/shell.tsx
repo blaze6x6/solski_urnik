@@ -39,11 +39,14 @@ type ShellProps = {
   yearName: string | null;
   dateLabel: string;
   notifications: NotificationItem[];
+  /** otroški profil: samo te strani (undefined = vse) */
+  navHrefs?: string[];
   children: ReactNode;
 };
 
-export function Shell({ userName, userEmail, yearName, dateLabel, notifications, children }: ShellProps) {
+export function Shell({ userName, userEmail, yearName, dateLabel, notifications, navHrefs, children }: ShellProps) {
   const pathname = usePathname();
+  const nav = navHrefs ? NAV.filter((n) => navHrefs.includes(n.href)) : NAV;
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
@@ -73,7 +76,7 @@ export function Shell({ userName, userEmail, yearName, dateLabel, notifications,
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -147,7 +150,7 @@ export function Shell({ userName, userEmail, yearName, dateLabel, notifications,
       {/* Mobilna spodnja navigacija */}
       <nav className="safe-bottomnav no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 backdrop-blur-md lg:hidden">
         <div className="flex overflow-x-auto px-2 py-2">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}

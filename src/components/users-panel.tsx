@@ -43,10 +43,13 @@ export type PanelUser = {
   id: number;
   name: string;
   email: string;
+  phone: string;
   notifyEmail: boolean;
   shared: boolean;
   isSelf: boolean;
   isOwner: boolean;
+  /** otroški profil (omejene pravice) */
+  isChild?: boolean;
   emails: PanelEmail[];
 };
 
@@ -99,6 +102,7 @@ function UserRow({ u }: { u: PanelUser }) {
             {u.name}
             {u.isSelf ? <span className="chip bg-[#dbeafe] text-[10px] text-[#15539c]">to ste vi</span> : null}
             {u.isOwner ? <span className="chip bg-[#eee3fd] text-[10px] text-[#5c21a8]">lastnik</span> : null}
+            {u.isChild ? <span className="chip bg-[#d8f8ea] text-[10px] text-[#046c46]">otroški profil</span> : null}
             {!u.shared ? <span className="chip bg-paper-deep text-[10px] text-ink-soft">ločeni podatki</span> : null}
           </p>
           <p className="truncate text-xs text-ink-soft">{u.email}</p>
@@ -119,12 +123,13 @@ function UserRow({ u }: { u: PanelUser }) {
         </form>
       </div>
 
-      <form action={formAction} className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2 max-sm:grid-cols-1">
+      <form action={formAction} className="mt-3 grid grid-cols-[1fr_1fr_1fr_auto] gap-2 max-sm:grid-cols-1">
         <input type="hidden" name="id" value={u.id} />
         <input name="name" required defaultValue={u.name} className="input !py-1.5" placeholder="Ime" />
         <input name="email" type="email" required defaultValue={u.email} className="input !py-1.5" placeholder="E-pošta" />
+        <input name="phone" type="tel" defaultValue={u.phone} className="input !py-1.5" placeholder="Telefon" />
         <button className="btn btn-ghost !px-3 !py-1.5 text-xs" disabled={pending}>
-          {pending ? "…" : "Preimenuj"}
+          {pending ? "…" : "Shrani"}
         </button>
       </form>
       <div className="mt-2">
@@ -335,6 +340,10 @@ export function UsersPanel({ users, invites }: { users: PanelUser[]; invites: Pe
         <div>
           <label className="label" htmlFor="nu-email">E-pošta</label>
           <input id="nu-email" name="email" type="email" required className="input" placeholder="nina@primer.si" />
+        </div>
+        <div>
+          <label className="label" htmlFor="nu-phone">Telefon (neobvezno)</label>
+          <input id="nu-phone" name="phone" type="tel" className="input" placeholder="npr. 031 123 456" />
         </div>
         <div>
           <label className="label" htmlFor="nu-pass">Začetno geslo</label>

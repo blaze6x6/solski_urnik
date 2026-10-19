@@ -4,6 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
+import { moduleAllowed, firstAllowedHref, parseChildPerms, type ChildModule, type ChildPerms } from "@/lib/child-permissions";
 
 export const SESSION_COOKIE = "urnik_seja";
 const SESSION_DAYS = 30;
@@ -52,11 +53,43 @@ export async function destroySession(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
+/** Piškotek z izvirno sejo superadmina, dokler gleda račun drugega uporabnika. */
+export const SUPER_COOKIE = "urnik_seja_super";
+export const IMPERSONATION_MINUTES = 120;
+
+/** Če je trenutna seja odprta »kot« drug uporabnik, vrne superadmina, ki jo je odprl. */
+export async function getImpersonator(): Promise<{ id: number; name: string } | null> {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const rows = await db
+    .select({ impersonatorId: sessions.impersonatorId })
+    .from(sessions)
+    .where(and(eq(sessions.id, token), gt(sessions.expiresAt, new Date())))
+    .limit(1);
+  const id = rows[0]?.impersonatorId;
+  if (!id) return null;
+  const sup = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, id)).limit(1);
+  return sup[0] ?? null;
+}
+
 /** Uporabnik + `scope` = id skupine, ki ji pripadajo skupni podatki. */
-export type SessionUser = User & { scope: number };
+export type SessionUser = User & {
+  scope: number;
+  /** otroški profil: omejene pravice, vidi samo podatke svojega otroka */
+  isChild: boolean;
+  /** pravice otroškega profila (null = administrator) */
+  perms: ChildPerms | null;
+};
 
 function withScope(user: User): SessionUser {
-  return { ...user, scope: user.householdId ?? user.id };
+  const isChild = user.childId !== null;
+  return {
+    ...user,
+    scope: user.householdId ?? user.id,
+    isChild,
+    perms: isChild ? parseChildPerms(user.childPerms) : null,
+  };
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -72,9 +105,33 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return rows[0] ? withScope(rows[0].user) : null;
 }
 
-export async function requireUser(): Promise<SessionUser> {
+/**
+ * Vsak prijavljen uporabnik, tudi otroški profil. Uporabi samo tam, kjer otrok sme delovati
+ * (pregled, urnik, koledar, beležke, ocene, videz, geslo, push) — in tam ponovno preveri pravice.
+ */
+export async function requireViewer(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+/**
+ * Prijavljen uporabnik, ki sme videti dani del aplikacije. Administrator vedno,
+ * otroški profil samo, če mu je stran omogočena (sicer preusmeritev na prvo dovoljeno).
+ */
+export async function requireModule(module: ChildModule): Promise<SessionUser> {
+  const user = await requireViewer();
+  if (user.perms && !moduleAllowed(user.perms, module)) redirect(firstAllowedHref(user.perms));
+  return user;
+}
+
+/**
+ * Administrator skupine (ali superadmin). Otroški profili so tu zavrnjeni, zato je
+ * vsaka stran in akcija privzeto nedostopna otroku, dokler ni izrecno odprta z requireViewer().
+ */
+export async function requireUser(): Promise<SessionUser> {
+  const user = await requireViewer();
+  if (user.isChild) redirect("/");
   return user;
 }
 

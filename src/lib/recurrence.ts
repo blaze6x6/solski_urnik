@@ -53,6 +53,10 @@ export type Occurrence = {
   cancelled: boolean;
   /** čas te ponovitve je spremenjen samo za ta dan (event že vsebuje nov čas) */
   timeChanged?: boolean;
+  /** opomba samo za to ponovitev (event.description jo že vsebuje) */
+  dayNote?: string;
+  /** izvirni opis dogodka (brez dodane opombe za ta dan) */
+  baseNote?: string;
 };
 
 const MAX_ITER = 400;

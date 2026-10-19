@@ -1,10 +1,13 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { todayISO } from "@/lib/time";
+import { MASK, isMaskedView } from "@/lib/privacy";
 import { db } from "@/db";
 import {
   busRoutes,
   busTimetables,
   children,
   eventCancellations,
+  eventOccurrenceNotes,
   eventTimeOverrides,
   eventReminders,
   events,
@@ -25,7 +28,16 @@ import { applySchoolYearEnd, expandEvents } from "@/lib/recurrence";
 // ---------------------------------------------------------------------------
 
 export async function getChildren(userId: number) {
-  return db.select().from(children).where(eq(children.userId, userId)).orderBy(asc(children.id));
+  const rows = await db.select().from(children).where(eq(children.userId, userId)).orderBy(asc(children.id));
+  // oddaljena pomoč (superadmin gleda račun): občutljivi podatki se skrijejo na strežniku
+  if (await isMaskedView()) {
+    return rows.map((c) => ({
+      ...c,
+      emso: c.emso ? MASK : "",
+      taxNumber: c.taxNumber ? MASK : "",
+    }));
+  }
+  return rows;
 }
 
 export async function getSubjects(userId: number) {
@@ -167,6 +179,18 @@ export async function timeOverrideMap(
   return map;
 }
 
+/** Opombe posameznih ponovitev (ključ `eventId|datum` -> opomba). */
+export async function occurrenceNoteMap(eventIds: number[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (eventIds.length === 0) return map;
+  const rows = await db
+    .select()
+    .from(eventOccurrenceNotes)
+    .where(inArray(eventOccurrenceNotes.eventId, eventIds));
+  for (const r of rows) map.set(`${r.eventId}|${r.occurrenceDate}`, r.note);
+  return map;
+}
+
 export function occurrenceKey(eventId: number, startDate: string): string {
   return `${eventId}|${startDate}`;
 }
@@ -181,7 +205,11 @@ export async function occurrencesInWindow(childIds: number[], start: string, end
   const base = applySchoolYearEnd(raw, years);
   const occs = expandEvents(base, start, end);
   const ids = [...new Set(occs.map((o) => o.event.id))];
-  const [cancelled, overrides] = await Promise.all([cancelledOccurrenceKeys(ids), timeOverrideMap(ids)]);
+  const [cancelled, overrides, dayNotes] = await Promise.all([
+    cancelledOccurrenceKeys(ids),
+    timeOverrideMap(ids),
+    occurrenceNoteMap(ids),
+  ]);
   for (const o of occs) {
     const key = occurrenceKey(o.event.id, o.startDate);
     o.cancelled = cancelled.has(key);
@@ -190,6 +218,14 @@ export async function occurrencesInWindow(childIds: number[], start: string, end
       // čas samo za ta termin: kopija dogodka z drugim časom (izvirnik ostane nespremenjen)
       o.event = { ...o.event, allDay: false, slotId: null, startTime: ov.startTime, endTime: ov.endTime };
       o.timeChanged = true;
+    }
+    o.baseNote = o.event.description?.trim() ?? "";
+    const dn = dayNotes.get(key);
+    if (dn) {
+      // opomba samo za ta termin se doda k opisu dogodka (kopija, izvirnik ostane nespremenjen)
+      const base = o.event.description?.trim() ?? "";
+      o.event = { ...o.event, description: base ? `${base}\n\nZa ta dan: ${dn}` : `Za ta dan: ${dn}` };
+      o.dayNote = dn;
     }
   }
   return occs.sort(
@@ -227,8 +263,35 @@ export async function getNotes(childId: number) {
     .orderBy(desc(notes.pinned), desc(notes.noteDate), desc(notes.id));
 }
 
+let lastNoteSweep = 0;
+
+/**
+ * Beležkam, ki jim je rok potekel (rok je pretekel včeraj ali prej), samodejno
+ * nastavi »opravljeno«. Ročno ponovno odprte (keepOpen) preskoči. Poskrbi, da se
+ * poteklo ne prikazuje več na pregledu; kliče se ob branju in po urniku.
+ */
+export async function completeExpiredNotes(force = false): Promise<number> {
+  const now = Date.now();
+  if (!force && now - lastNoteSweep < 60_000) return 0;
+  lastNoteSweep = now;
+  const rows = await db
+    .update(notes)
+    .set({ done: true, doneAt: new Date() })
+    .where(
+      and(
+        eq(notes.done, false),
+        eq(notes.keepOpen, false),
+        isNotNull(notes.dueDate),
+        lt(notes.dueDate, todayISO()),
+      ),
+    )
+    .returning({ id: notes.id });
+  return rows.length;
+}
+
 /** Odprte (neopravljene) beležke otroka — za pregled. */
 export async function getOpenNotes(childId: number) {
+  await completeExpiredNotes();
   return db
     .select()
     .from(notes)
@@ -243,6 +306,18 @@ export async function getGrades(childId: number) {
     .innerJoin(subjects, eq(subjects.id, grades.subjectId))
     .where(eq(grades.childId, childId))
     .orderBy(asc(subjects.name), desc(grades.gradeDate));
+}
+
+/** Otroci, ki jih uporabnik sme videti: administrator vse v skupini, otroški profil samo svojega. */
+export async function getVisibleChildren(user: { scope: number; childId: number | null }) {
+  const kids = await getChildren(user.scope);
+  return user.childId === null ? kids : kids.filter((k) => k.id === user.childId);
+}
+
+/** Otrok skupine, do katerega ima uporabnik dostop (otroški profil samo do svojega). */
+export async function getAccessibleChild(user: { scope: number; childId: number | null }, childId: number) {
+  if (user.childId !== null && user.childId !== childId) return null;
+  return getOwnedChild(user.scope, childId);
 }
 
 export async function getOwnedChild(userId: number, childId: number) {
