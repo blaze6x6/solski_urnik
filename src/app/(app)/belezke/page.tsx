@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CalendarClock, Check, NotebookPen, Pencil, Pin, PinOff, Trash2, Undo2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
-import { getChildren, getNotes, getSubjects } from "@/lib/data";
+import { requireModule } from "@/lib/auth";
+import { notesAccess } from "@/lib/child-permissions";
+import { getNotes, getSubjects, getVisibleChildren } from "@/lib/data";
 import { deleteNoteAction, saveNoteAction, togglePinNoteAction, toggleNoteDoneAction } from "@/app/actions/notes";
 import { REMIND_OPTIONS, dueText, isDueSoon, remindLabel } from "@/lib/notes";
 import { cn, subjectColor } from "@/lib/colors";
@@ -12,15 +13,17 @@ export const metadata = { title: "Beležke" };
 type SearchParams = { otrok?: string; uredi?: string };
 
 export default async function BelezkePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireModule("belezke");
+  const level = notesAccess(user);
+  const canAdd = level === "own" || level === "all";
   const sp = await searchParams;
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
 
   if (kids.length === 0) {
     return (
       <div className="card mx-auto max-w-xl px-8 py-14 text-center">
         <h1 className="font-display text-2xl font-semibold">Ni dodanih otrok</h1>
-        <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">Odpri nastavitve</Link>
+        {user.isChild ? null : <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">Odpri nastavitve</Link>}
       </div>
     );
   }
@@ -29,7 +32,9 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
   const [subjects, rawRows] = await Promise.all([getSubjects(user.scope), getNotes(selected.id)]);
   // opravljene beležke na konec seznama
   const noteRows = [...rawRows.filter((r) => !r.note.done), ...rawRows.filter((r) => r.note.done)];
-  const editing = rawRows.find((r) => r.note.id === Number(sp.uredi))?.note ?? null;
+  // otrok sme urejati, pripenjati in brisati samo svoje beležke; starš vse
+  const canEdit = (n: { createdBy: number | null }) => level === "all" || (level === "own" && n.createdBy === user.id);
+  const editing = rawRows.find((r) => r.note.id === Number(sp.uredi) && canEdit(r.note))?.note ?? null;
   const today = todayISO();
 
   return (
@@ -58,7 +63,7 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
             <div className="card px-6 py-14 text-center">
               <NotebookPen className="mx-auto mb-3 h-8 w-8 text-ink-faint" strokeWidth={1.8} />
               <p className="font-display text-xl font-semibold">Še ni beležk</p>
-              <p className="mt-2 text-sm text-ink-soft">Prvo beležko dodajte v obrazcu desno.</p>
+              <p className="mt-2 text-sm text-ink-soft">{canAdd ? "Prvo beležko dodajte v obrazcu desno." : "Beležk še ni."}</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -110,6 +115,7 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
                         ) : null}
                       </div>
                       <div className="flex gap-1">
+                        {canAdd ? (
                         <form action={toggleNoteDoneAction}>
                           <input type="hidden" name="id" value={note.id} />
                           <input type="hidden" name="childId" value={selected.id} />
@@ -121,9 +127,13 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
                             )}
                           </button>
                         </form>
+                        ) : null}
+                        {canEdit(note) ? (
                         <Link href={`/belezke?otrok=${selected.id}&uredi=${note.id}`} className="icon-btn" title="Uredi">
                           <Pencil className="h-4 w-4" strokeWidth={2.2} />
                         </Link>
+                        ) : null}
+                        {canEdit(note) ? (
                         <form action={togglePinNoteAction}>
                           <input type="hidden" name="id" value={note.id} />
                           <input type="hidden" name="childId" value={selected.id} />
@@ -135,6 +145,8 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
                             )}
                           </button>
                         </form>
+                        ) : null}
+                        {canEdit(note) ? (
                         <form action={deleteNoteAction}>
                           <input type="hidden" name="id" value={note.id} />
                           <input type="hidden" name="childId" value={selected.id} />
@@ -142,6 +154,7 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
                             <Trash2 className="h-4 w-4" strokeWidth={2.2} />
                           </button>
                         </form>
+                        ) : null}
                       </div>
                     </div>
                   </article>
@@ -151,6 +164,7 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
           )}
         </div>
 
+        {canAdd ? (
         <div className="xl:sticky xl:top-20 xl:self-start">
           <form key={editing?.id ?? "nova"} action={saveNoteAction} className="card space-y-4 p-5">
             <h3 className="font-display text-lg font-semibold">{editing ? "Uredi beležko" : "Nova beležka"}</h3>
@@ -210,6 +224,7 @@ export default async function BelezkePage({ searchParams }: { searchParams: Prom
             ) : null}
           </form>
         </div>
+        ) : null}
       </div>
     </div>
   );

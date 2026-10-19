@@ -16,16 +16,20 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import { householdUsers, requireUser } from "@/lib/auth";
+import { householdUsers, requireViewer } from "@/lib/auth";
 import {
   getAllHouseholds,
   getBreaksForYear,
-  getChildren,
   getSchoolYears,
+  getVisibleChildren,
   getSlots,
   getSubjects,
 } from "@/lib/data";
 import { saveChildAction, deleteChildAction } from "@/app/actions/children";
+import { ChildProfileSection, NewChildProfileFields } from "@/components/child-profile";
+import { db } from "@/db";
+import { users as usersTable } from "@/db/schema";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { saveSubjectAction, deleteSubjectAction } from "@/app/actions/subjects";
 import { activateSchoolYearAction, deleteBreakAction, deleteSchoolYearAction, saveBreakAction, saveSchoolYearAction, setNotifyEmailAction } from "@/app/actions/school";
 import { sendDigestNowAction } from "@/app/actions/email";
@@ -43,6 +47,10 @@ import { PushPanel } from "@/components/push-panel";
 import { PUSH_KINDS, getVapidPublicKey, listSubscriptions } from "@/lib/push";
 import { listUserEmails } from "@/lib/recipients";
 import { pendingInvites } from "@/lib/invites";
+import { getRegistrationSettings } from "@/lib/app-settings";
+import { getRegistrationRequests } from "@/lib/registration";
+import { isMaskedView } from "@/lib/privacy";
+import { childSettingsTabs, parseChildPerms } from "@/lib/child-permissions";
 
 export const metadata = { title: "Nastavitve" };
 
@@ -63,15 +71,20 @@ const SUPERADMIN_TAB = { key: "superadmin", label: "Superadmin", icon: ShieldChe
 const CHILD_COLOR_OPTIONS = CHILD_COLORS.map((c) => ({ value: c.value, label: c.label, color: c.value }));
 const SUBJECT_COLOR_OPTIONS = SUBJECT_PALETTE.map((p, i) => ({ value: String(i), label: p.label, color: p.solid }));
 
-type SearchParams = { tab?: string; otrok?: string; poslano?: string; napaka?: string };
+type SearchParams = { tab?: string; otrok?: string; poslano?: string; napaka?: string; profilNapaka?: string };
+
 
 export default async function NastavitvePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireViewer();
   const sp = await searchParams;
-  const tab = sp.tab ?? "otroci";
+  // otroški profil: samo videz, naprava (push) in geslo
+  const childTabs = user.perms ? childSettingsTabs(user.perms) : [];
+  const tab = user.perms
+    ? childTabs.includes(sp.tab ?? "") ? (sp.tab as string) : "videz"
+    : (sp.tab ?? "otroci");
 
   const [kids, subjects, years] = await Promise.all([
-    getChildren(user.scope),
+    getVisibleChildren(user),
     getSubjects(user.scope),
     getSchoolYears(user.scope),
   ]);
@@ -81,6 +94,18 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
   const slotKid = kids.find((k) => k.id === Number(sp.otrok)) ?? kids[0] ?? null;
   const slots = tab === "ure" && slotKid ? await getSlots(slotKid.id) : [];
 
+  // otroški profili skupine (otrok → e-pošta prijave)
+  const profileRows =
+    tab === "otroci" && !user.isChild
+      ? await db
+          .select({ childId: usersTable.childId, email: usersTable.email, perms: usersTable.childPerms })
+          .from(usersTable)
+          .where(and(eq(usersTable.householdId, user.scope), isNotNull(usersTable.childId)))
+      : [];
+  const profileByChild = new Map(
+    profileRows.map((r) => [r.childId as number, { email: r.email as string, perms: parseChildPerms(r.perms as string | null) }]),
+  );
+
   const members: PanelUser[] =
     tab === "uporabniki"
       ? await Promise.all(
@@ -88,10 +113,12 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
             id: u.id,
             name: u.name,
             email: u.email,
+            phone: u.phone,
             notifyEmail: u.notifyEmail,
             shared: (u.householdId ?? u.id) === user.scope,
             isSelf: u.id === user.id,
             isOwner: u.id === user.scope,
+            isChild: u.childId !== null,
             emails: (await listUserEmails(u.id)).map((e) => ({
               id: e.id,
               email: e.email,
@@ -105,6 +132,15 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
         )
       : [];
 
+  // starši (administratorji skupine) za prikaz v otroškem profilu
+  const parents =
+    tab === "racun" && user.isChild
+      ? (await householdUsers(user.scope))
+          .filter((u) => u.childId === null)
+          .map((u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone }))
+      : [];
+
+  const masked = await isMaskedView();
   const sectionCard = "card p-6";
   const h2 = "font-display text-xl font-semibold";
   const sub = "mt-1 text-sm text-ink-soft";
@@ -117,7 +153,12 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
       </header>
 
       <div className="mb-6 flex flex-wrap gap-1.5 rounded-2xl border border-line bg-white p-1.5">
-        {(user.isSuperadmin ? [...TABS, SUPERADMIN_TAB] : TABS).map((t) => (
+        {(user.isChild
+          ? TABS.filter((t) => childTabs.includes(t.key))
+          : user.isSuperadmin
+            ? [...TABS, SUPERADMIN_TAB]
+            : TABS
+        ).map((t) => (
           <Link
             key={t.key}
             href={`/nastavitve?tab=${t.key}${t.key === "ure" && slotKid ? `&otrok=${slotKid.id}` : ""}`}
@@ -132,6 +173,11 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
       {/* ------------------------- OTROCI ------------------------- */}
       {tab === "otroci" ? (
         <div className="grid gap-6 lg:grid-cols-2">
+          {sp.profilNapaka ? (
+            <p className="col-span-full flex items-center gap-2 rounded-xl border border-[#e6c4ba] bg-[#faeeea] px-4 py-3 text-sm font-medium text-[#a03d2e]">
+              Otrok ni bil dodan: {sp.profilNapaka}
+            </p>
+          ) : null}
           {kids.map((k) => (
             <div key={k.id} className={sectionCard}>
               <form action={saveChildAction} className="space-y-4">
@@ -174,11 +220,11 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
                   </div>
                   <div>
                     <label className="label">EMŠO</label>
-                    <input name="emso" className="input" inputMode="numeric" maxLength={13} defaultValue={k.emso} placeholder="13 številk" />
+                    <input name="emso" className="input" inputMode="numeric" maxLength={13} defaultValue={k.emso} readOnly={masked} placeholder="13 številk" />
                   </div>
                   <div>
                     <label className="label">Davčna številka</label>
-                    <input name="taxNumber" className="input" inputMode="numeric" maxLength={10} defaultValue={k.taxNumber} placeholder="8 številk" />
+                    <input name="taxNumber" className="input" inputMode="numeric" maxLength={10} defaultValue={k.taxNumber} readOnly={masked} placeholder="8 številk" />
                   </div>
                   <div>
                     <label className="label">Telefon</label>
@@ -188,11 +234,23 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
                     <label className="label">E-pošta</label>
                     <input name="email" className="input" inputMode="email" defaultValue={k.email} placeholder="ime@primer.si" />
                   </div>
+                  <div className="col-span-2">
+                    <label className="label">Dodatni e-poštni naslovi</label>
+                    <textarea
+                      name="extraEmails"
+                      className="input min-h-[64px]"
+                      rows={2}
+                      defaultValue={k.extraEmails}
+                      placeholder="po en naslov v vrstici (neobvezno)"
+                    />
+                    <p className="mt-1 text-[11px] text-ink-faint">Zgornja e-pošta je primarna in se prikaže v podatkih otroka ter uporablja za prijavo.</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="btn btn-primary">Shrani</button>
                 </div>
               </form>
+              <ChildProfileSection childId={k.id} childEmail={k.email} profile={profileByChild.get(k.id) ?? null} />
               <form
                 action={deleteChildAction}
                 className="mt-3 border-t border-line pt-3"
@@ -258,6 +316,11 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
                   <label className="label">E-pošta</label>
                   <input name="email" className="input" inputMode="email"  placeholder="ime@primer.si" />
                 </div>
+                <div className="col-span-2">
+                  <label className="label">Dodatni e-poštni naslovi</label>
+                  <textarea name="extraEmails" className="input min-h-[64px]" rows={2} placeholder="po en naslov v vrstici (neobvezno)" />
+                </div>
+                <NewChildProfileFields />
               </div>
               <button className="btn btn-primary">
                 <Plus className="h-4 w-4" strokeWidth={2.4} />
@@ -513,7 +576,16 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
 
       {/* ------------------------- SUPERADMIN ------------------------- */}
       {tab === "superadmin" && user.isSuperadmin ? (
-        <SuperadminPanel households={await getAllHouseholds()} selfId={user.id} invites={await pendingInvites(null)} />
+        <SuperadminPanel
+          households={await getAllHouseholds()}
+          selfId={user.id}
+          invites={await pendingInvites(null)}
+          registration={{
+            ...(await getRegistrationSettings()),
+            smtpReady: smtpConfigured(),
+            requests: await getRegistrationRequests(),
+          }}
+        />
       ) : null}
 
       {/* ------------------------- NAPRAVA ------------------------- */}
@@ -631,21 +703,59 @@ export default async function NastavitvePage({ searchParams }: { searchParams: P
                 <dt className="text-ink-soft">E-pošta</dt>
                 <dd className="font-semibold">{user.email}</dd>
               </div>
-              <div className="flex justify-between rounded-xl border border-line bg-white px-4 py-3">
-                <dt className="text-ink-soft">Otroci</dt>
-                <dd className="font-semibold">{kids.length}</dd>
-              </div>
-              <div className="flex justify-between rounded-xl border border-line bg-white px-4 py-3">
-                <dt className="text-ink-soft">Predmeti</dt>
-                <dd className="font-semibold">{subjects.length}</dd>
-              </div>
+              {user.isChild || !user.phone ? null : (
+                <div className="flex justify-between rounded-xl border border-line bg-white px-4 py-3">
+                  <dt className="text-ink-soft">Telefon</dt>
+                  <dd className="font-semibold">{user.phone}</dd>
+                </div>
+              )}
+              {user.isChild ? null : (
+                <>
+                  <div className="flex justify-between rounded-xl border border-line bg-white px-4 py-3">
+                    <dt className="text-ink-soft">Otroci</dt>
+                    <dd className="font-semibold">{kids.length}</dd>
+                  </div>
+                  <div className="flex justify-between rounded-xl border border-line bg-white px-4 py-3">
+                    <dt className="text-ink-soft">Predmeti</dt>
+                    <dd className="font-semibold">{subjects.length}</dd>
+                  </div>
+                </>
+              )}
             </dl>
-            <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-ink-faint">
-              <Palmtree className="mt-0.5 h-4 w-4 shrink-0 text-[#687a25]" strokeWidth={2.2} />
-              Nasvet: novemu otroku se ob dodajanju samodejno ustvari privzet vrstni red ur, ki ga
-              prilagodite v zavihku “Vrstni red ur”.
-            </p>
+            {user.isChild ? null : (
+              <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-ink-faint">
+                <Palmtree className="mt-0.5 h-4 w-4 shrink-0 text-[#687a25]" strokeWidth={2.2} />
+                Nasvet: novemu otroku se ob dodajanju samodejno ustvari privzet vrstni red ur, ki ga
+                prilagodite v zavihku “Vrstni red ur”.
+              </p>
+            )}
           </div>
+          {user.isChild ? (
+            <div className={cn(sectionCard, "lg:col-span-2")}>
+              <h2 className={h2}>Moji starši</h2>
+              <p className={sub}>Kontaktni podatki administratorjev skupine.</p>
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                {parents.map((p) => (
+                  <li key={p.id} className="rounded-xl border border-line bg-white px-4 py-3 text-sm">
+                    <p className="font-semibold">{p.name}</p>
+                    <a href={`mailto:${p.email}`} className="mt-1 block break-all text-spruce underline-offset-2 hover:underline">
+                      {p.email}
+                    </a>
+                    {p.phone ? (
+                      <a
+                        href={`tel:${p.phone.replace(/[^+\d]/g, "")}`}
+                        className="mt-0.5 block font-semibold text-spruce underline-offset-2 hover:underline"
+                      >
+                        {p.phone}
+                      </a>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-ink-faint">Telefon ni vnesen</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

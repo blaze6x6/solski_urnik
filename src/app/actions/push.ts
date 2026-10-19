@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { PUSH_DEVICE_COOKIE, removeOtherUsersOfEndpoint, sendPushTo } from "@/lib/push";
 
@@ -20,7 +20,8 @@ export async function savePushSubscriptionAction(input: {
   kinds: string[];
   userAgent?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  const user = await requireUser();
+  const user = await requireViewer();
+  if (user.perms && !user.perms.push) return { ok: false, error: "Push obvestila za ta profil niso omogočena." };
   const endpoint = String(input?.endpoint ?? "");
   const p256dh = String(input?.p256dh ?? "");
   const auth = String(input?.auth ?? "");
@@ -49,7 +50,7 @@ async function setDeviceCookie(id: number | null): Promise<void> {
 
 /** Že naročena naprava si zapomni svoj id (za izključitev lastnih sprememb). */
 export async function markPushDeviceAction(endpoint: string): Promise<void> {
-  const user = await requireUser();
+  const user = await requireViewer();
   const rows = await db
     .select({ id: pushSubscriptions.id })
     .from(pushSubscriptions)
@@ -59,7 +60,7 @@ export async function markPushDeviceAction(endpoint: string): Promise<void> {
 }
 
 export async function updatePushKindsAction(input: { endpoint: string; kinds: string[] }): Promise<void> {
-  const user = await requireUser();
+  const user = await requireViewer();
   await db
     .update(pushSubscriptions)
     .set({ kinds: cleanKinds(input.kinds) })
@@ -68,7 +69,7 @@ export async function updatePushKindsAction(input: { endpoint: string; kinds: st
 }
 
 export async function removePushSubscriptionAction(endpoint: string): Promise<void> {
-  const user = await requireUser();
+  const user = await requireViewer();
   await db
     .delete(pushSubscriptions)
     .where(and(eq(pushSubscriptions.endpoint, String(endpoint)), eq(pushSubscriptions.userId, user.id)));
@@ -78,7 +79,8 @@ export async function removePushSubscriptionAction(endpoint: string): Promise<vo
 
 /** Preizkusno obvestilo na to napravo. */
 export async function sendTestPushAction(endpoint: string): Promise<{ ok: boolean; error?: string }> {
-  const user = await requireUser();
+  const user = await requireViewer();
+  if (user.perms && !user.perms.push) return { ok: false, error: "Push obvestila za ta profil niso omogočena." };
   const rows = await db
     .select()
     .from(pushSubscriptions)

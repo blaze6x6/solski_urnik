@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Star, Trash2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
-import { getChildren, getGrades, getSubjects } from "@/lib/data";
-import { addGradeAction, deleteGradeAction } from "@/app/actions/grades";
+import { Check, Hourglass, Pencil, Star, Trash2, X } from "lucide-react";
+import { requireModule } from "@/lib/auth";
+import { gradesAccess } from "@/lib/child-permissions";
+import { getGrades, getSubjects, getVisibleChildren } from "@/lib/data";
+import { addGradeAction, deleteGradeAction, rejectGradeDeleteAction, updateGradeAction } from "@/app/actions/grades";
 import { GRADE_COLORS, cn, subjectColor } from "@/lib/colors";
 import { formatShortSI, todayISO } from "@/lib/time";
 import { OCENA, count } from "@/lib/plural";
@@ -11,24 +12,31 @@ export const metadata = { title: "Ocene" };
 
 const GRADE_TYPES = ["pisni izpit", "krajši pisni izpit", "ustno ocenjevanje", "domača naloga", "praktična naloga", "projektna naloga", "esej", "test", "ostalo"];
 
-type SearchParams = { otrok?: string };
+type SearchParams = { otrok?: string; uredi?: string };
 
 export default async function OcenePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireModule("ocene");
+  const level = gradesAccess(user);
+  const canWrite = level === "edit" || level === "full";
+  const requestsOnly = level === "edit";
   const sp = await searchParams;
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
 
   if (kids.length === 0) {
     return (
       <div className="card mx-auto max-w-xl px-8 py-14 text-center">
         <h1 className="font-display text-2xl font-semibold">Ni dodanih otrok</h1>
-        <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">Odpri nastavitve</Link>
+        {user.isChild ? null : <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">Odpri nastavitve</Link>}
       </div>
     );
   }
 
   const selected = kids.find((k) => k.id === Number(sp.otrok)) ?? kids[0];
   const [subjects, rows] = await Promise.all([getSubjects(user.scope), getGrades(selected.id)]);
+
+  const editing = canWrite ? (rows.find((r) => r.grade.id === Number(sp.uredi))?.grade ?? null) : null;
+  // otrokove prošnje za izbris (potrdi jih starš)
+  const deleteRequests = rows.filter((r) => r.grade.deleteRequestedAt !== null);
 
   const bySubject = new Map<number, { subject: (typeof rows)[number]["subject"]; grades: (typeof rows)[number]["grade"][] }>();
   for (const r of rows) {
@@ -73,12 +81,46 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
+      {!user.isChild && deleteRequests.length > 0 ? (
+        <div className="card mb-5 space-y-2 border-amber/50 bg-[#fffaf0] p-4">
+          <p className="flex items-center gap-2 text-sm font-bold">
+            <Hourglass className="h-4 w-4 text-amber-strong" strokeWidth={2.4} />
+            {selected.name} prosi za izbris {deleteRequests.length === 1 ? "ocene" : "ocen"}
+          </p>
+          {deleteRequests.map((r) => (
+            <div key={r.grade.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-[13px]">
+              <span className="font-bold tabular-nums">{r.grade.grade}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {r.subject.name} · {r.grade.type} · {formatShortSI(r.grade.gradeDate)}
+                {r.grade.note ? ` · ${r.grade.note}` : ""}
+              </span>
+              <form action={deleteGradeAction}>
+                <input type="hidden" name="id" value={r.grade.id} />
+                <input type="hidden" name="childId" value={selected.id} />
+                <button className="btn btn-danger !px-3 !py-1.5 text-xs">
+                  <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                  Potrdi izbris
+                </button>
+              </form>
+              <form action={rejectGradeDeleteAction}>
+                <input type="hidden" name="id" value={r.grade.id} />
+                <input type="hidden" name="childId" value={selected.id} />
+                <button className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                  <X className="h-3.5 w-3.5" strokeWidth={2.6} />
+                  Zavrni
+                </button>
+              </form>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div>
           {bySubject.size === 0 ? (
             <div className="card px-6 py-14 text-center">
               <p className="font-display text-xl font-semibold">Še ni ocen</p>
-              <p className="mt-2 text-sm text-ink-soft">Prvo oceno dodajte v obrazcu desno.</p>
+              <p className="mt-2 text-sm text-ink-soft">{canWrite ? "Prvo oceno dodajte v obrazcu desno." : "Ocen še ni."}</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -107,16 +149,40 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
                             >
                               {g.grade}
                             </span>
+                            {canWrite ? (
+                            <Link
+                              href={`/ocene?otrok=${selected.id}&uredi=${g.id}`}
+                              className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-spruce text-white shadow-md ring-2 ring-white"
+                              title="Uredi oceno"
+                            >
+                              <Pencil className="h-2.5 w-2.5" strokeWidth={3} />
+                            </Link>
+                            ) : null}
+                            {canWrite ? (
                             <form action={deleteGradeAction} className="absolute -top-2 -right-2">
                               <input type="hidden" name="id" value={g.id} />
                               <input type="hidden" name="childId" value={selected.id} />
                               <button
-                                className="flex h-5 w-5 items-center justify-center rounded-full bg-[#a03d2e] text-white shadow-md ring-2 ring-white"
-                                title="Izbriši oceno"
+                                className={cn(
+                                  "flex h-5 w-5 items-center justify-center rounded-full text-white shadow-md ring-2 ring-white",
+                                  g.deleteRequestedAt ? "bg-amber-strong" : "bg-[#a03d2e]",
+                                )}
+                                title={
+                                  requestsOnly
+                                    ? g.deleteRequestedAt
+                                      ? "Čaka na potrditev starša (klik prekliče prošnjo)"
+                                      : "Zaprosi starša za izbris ocene"
+                                    : "Izbriši oceno"
+                                }
                               >
-                                <Trash2 className="h-2.5 w-2.5" strokeWidth={3} />
+                                {requestsOnly && g.deleteRequestedAt ? (
+                                  <Hourglass className="h-2.5 w-2.5" strokeWidth={3} />
+                                ) : (
+                                  <Trash2 className="h-2.5 w-2.5" strokeWidth={3} />
+                                )}
                               </button>
                             </form>
+                            ) : null}
                           </span>
                         );
                       })}
@@ -131,13 +197,15 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
           )}
         </div>
 
+        {canWrite ? (
         <div className="xl:sticky xl:top-20 xl:self-start">
-          <form action={addGradeAction} className="card space-y-4 p-5">
-            <h3 className="font-display text-lg font-semibold">Dodaj oceno</h3>
+          <form key={editing?.id ?? "nova"} action={editing ? updateGradeAction : addGradeAction} className="card space-y-4 p-5">
+            <h3 className="font-display text-lg font-semibold">{editing ? "Uredi oceno" : "Dodaj oceno"}</h3>
+            {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
             <input type="hidden" name="childId" value={selected.id} />
             <div>
               <label className="label" htmlFor="subjectId">Predmet</label>
-              <select id="subjectId" name="subjectId" required className="input">
+              <select id="subjectId" name="subjectId" required className="input" defaultValue={editing?.subjectId}>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.abbr})
@@ -148,7 +216,7 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label" htmlFor="grade">Ocena</label>
-                <select id="grade" name="grade" required className="input" defaultValue="5">
+                <select id="grade" name="grade" required className="input" defaultValue={String(editing?.grade ?? 5)}>
                   {[5, 4, 3, 2, 1].map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -158,12 +226,12 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
               </div>
               <div>
                 <label className="label" htmlFor="gradeDate">Datum</label>
-                <input id="gradeDate" name="gradeDate" type="date" required className="input" defaultValue={todayISO()} />
+                <input id="gradeDate" name="gradeDate" type="date" required className="input" defaultValue={editing?.gradeDate ?? todayISO()} />
               </div>
             </div>
             <div>
               <label className="label" htmlFor="type">Vrsta</label>
-              <select id="type" name="type" className="input">
+              <select id="type" name="type" className="input" defaultValue={editing?.type}>
                 {GRADE_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -173,13 +241,19 @@ export default async function OcenePage({ searchParams }: { searchParams: Promis
             </div>
             <div>
               <label className="label" htmlFor="note">Opomba</label>
-              <input id="note" name="note" className="input" placeholder="npr. Decimalna števila" />
+              <input id="note" name="note" className="input" placeholder="npr. Decimalna števila" defaultValue={editing?.note ?? ""} />
             </div>
             <button className="btn btn-primary w-full" disabled={subjects.length === 0}>
-              Shrani oceno
+              {editing ? "Shrani spremembe" : "Shrani oceno"}
             </button>
+            {editing ? (
+              <Link href={`/ocene?otrok=${selected.id}`} className="btn btn-ghost w-full">
+                Prekliči urejanje
+              </Link>
+            ) : null}
           </form>
         </div>
+        ) : null}
       </div>
     </div>
   );

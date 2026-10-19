@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Flag, Palmtree, Settings } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { requireModule } from "@/lib/auth";
+import { notesAccess } from "@/lib/child-permissions";
 import {
   getActiveSchoolYear,
   getBreaksForYear,
   getBusRoutes,
-  getChildren,
+  getVisibleChildren,
   getSlots,
   getCancelledLessons,
   getOpenNotes,
@@ -48,8 +49,13 @@ function nextSchoolDayLabel(fromISO: string): string {
 }
 
 export default async function DashboardPage() {
-  const user = await requireUser();
-  const kids = await getChildren(user.scope);
+  const user = await requireModule("pregled");
+  const kids = await getVisibleChildren(user);
+  // otroški profil: razdelki, ki jih starš ni omogočil, se na pregledu ne prikažejo
+  const showBus = !user.perms || user.perms.avtobus;
+  const notesLevel = notesAccess(user);
+  const showNotes = notesLevel !== "off";
+  const canToggleNotes = notesLevel === "own" || notesLevel === "all";
   const year = await getActiveSchoolYear(user.scope);
   const breaks = year ? await getBreaksForYear(year.id) : [];
 
@@ -148,6 +154,8 @@ export default async function DashboardPage() {
           color: o.event.color,
           allDay: o.event.allDay,
           cancelled: o.cancelled,
+          note: o.event.description?.trim() || null,
+          location: o.event.location || null,
         }));
 
       const noteItems = openNotes.map((n) => ({
@@ -159,7 +167,14 @@ export default async function DashboardPage() {
         overdue: n.dueDate !== null && n.dueDate < today,
       }));
 
-      return { kid, lessons, busTo: busItems("to"), busFrom: busItems("from"), eventsToday, noteItems };
+      return {
+        kid,
+        lessons,
+        busTo: showBus ? busItems("to") : [],
+        busFrom: showBus ? busItems("from") : [],
+        eventsToday,
+        noteItems: showNotes ? noteItems : [],
+      };
     }),
   );
 
@@ -198,15 +213,18 @@ export default async function DashboardPage() {
 
       {kids.length === 0 ? (
         <div className="card mx-auto max-w-xl px-8 py-14 text-center">
-          <h2 className="font-display text-2xl font-semibold">Dodajte prvega otroka</h2>
+          <h2 className="font-display text-2xl font-semibold">{user.isChild ? "Ni podatkov" : "Dodajte prvega otroka"}</h2>
           <p className="mx-auto mt-3 max-w-sm text-sm text-ink-soft">
-            Za začetek v nastavitvah dodajte otroka, predmete in urnik — pregled se nato
-            zapolni samodejno.
+            {user.isChild
+              ? "Za ta profil trenutno ni podatkov."
+              : "Za začetek v nastavitvah dodajte otroka, predmete in urnik — pregled se nato zapolni samodejno."}
           </p>
-          <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">
-            <Settings className="h-4 w-4" strokeWidth={2.2} />
-            Odpri nastavitve
-          </Link>
+          {user.isChild ? null : (
+            <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">
+              <Settings className="h-4 w-4" strokeWidth={2.2} />
+              Odpri nastavitve
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -223,6 +241,8 @@ export default async function DashboardPage() {
               busFrom={busFrom}
               eventsToday={eventsToday}
               notes={noteItems}
+              canToggleNotes={canToggleNotes}
+              showBus={showBus}
             />
           ))}
         </div>

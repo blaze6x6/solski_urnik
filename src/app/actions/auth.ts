@@ -49,6 +49,7 @@ export async function logoutAction(): Promise<void> {
 export async function changePasswordAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const user = await getSessionUser();
   if (!user) return { error: "Seja je potekla. Prijavite se znova." };
+  if (user.perms && !user.perms.geslo) return { error: "Spreminjanje gesla za ta profil ni omogočeno. Prosite starša." };
 
   const current = String(formData.get("current") ?? "");
   const next = String(formData.get("next") ?? "");

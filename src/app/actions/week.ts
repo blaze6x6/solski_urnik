@@ -1,7 +1,7 @@
 "use server";
 
-import { requireUser } from "@/lib/auth";
-import { getActiveSchoolYear, getBreaksForYear, getChildren } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
+import { getActiveSchoolYear, getBreaksForYear, getVisibleChildren } from "@/lib/data";
 import { buildChildWeek } from "@/lib/week";
 import type { WeekPayload } from "@/components/timetable-grid";
 
@@ -13,11 +13,12 @@ export async function loadChildWeekAction(input: {
   childId: number;
   weekOffset: number;
 }): Promise<WeekPayload | null> {
-  const user = await requireUser();
+  const user = await requireViewer();
+  if (user.perms && !user.perms.urnik) return null;
   const childId = Number(input.childId);
   const weekOffset = Math.max(-52, Math.min(52, Math.trunc(Number(input.weekOffset) || 0)));
 
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
   if (!kids.some((k) => k.id === childId)) return null;
 
   const year = await getActiveSchoolYear(user.scope);

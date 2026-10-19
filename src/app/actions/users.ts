@@ -20,6 +20,7 @@ export async function createUserAction(_prev: UserFormState, formData: FormData)
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const phone = String(formData.get("phone") ?? "").trim().slice(0, 40);
 
   if (!name || !email) return { error: "Vnesite ime in e-pošto." };
   if (password.length < 6) return { error: "Geslo mora imeti vsaj 6 znakov." };
@@ -30,6 +31,7 @@ export async function createUserAction(_prev: UserFormState, formData: FormData)
   await db.insert(users).values({
     name,
     email,
+    phone,
     passwordHash: hashPassword(password),
     // vedno v skupino tistega, ki dodaja (skupni dostop do istih otrok/urnikov)
     householdId: me.scope,
@@ -66,6 +68,7 @@ export async function updateUserAction(_prev: UserFormState, formData: FormData)
   const id = Number(formData.get("id") ?? 0);
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim().slice(0, 40);
   if (!id || !name || !email) return { error: "Ime in e-pošta sta obvezna." };
 
   const members = await householdUsers(me.scope);
@@ -74,7 +77,7 @@ export async function updateUserAction(_prev: UserFormState, formData: FormData)
   const clash = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (clash[0] && clash[0].id !== id) return { error: "E-pošta je že v uporabi." };
 
-  await db.update(users).set({ name, email }).where(eq(users.id, id));
+  await db.update(users).set({ name, email, phone }).where(eq(users.id, id));
   refresh();
   return { ok: "Shranjeno." };
 }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarDays, GraduationCap, Bus } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { LoginForm } from "@/components/login-form";
+import { getRegistrationSettings } from "@/lib/app-settings";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata = { title: "Prijava" };
@@ -16,6 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const user = await getSessionUser();
   if (user) redirect("/");
+  const { enabled: canRequest } = await getRegistrationSettings();
 
   return (
     <main className="safe-login flex min-h-dvh">
@@ -79,7 +81,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Zasebni dostop za administratorja družinskega urnika.
           </p>
 
-          <LoginForm resetDone={sp.ponastavljeno === "1"} />
+          <LoginForm resetDone={sp.ponastavljeno === "1"} canRequest={canRequest} />
 
         </div>
         <SiteFooter />

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { requireUser } from "@/lib/auth";
-import { getActiveSchoolYear, getBreaksForYear, getChildren, getSlots, occurrencesInWindow } from "@/lib/data";
+import { requireModule } from "@/lib/auth";
+import { getActiveSchoolYear, getBreaksForYear, getSlots, getVisibleChildren, occurrencesInWindow } from "@/lib/data";
 import { smtpConfigured } from "@/lib/email";
 import { slotTitle } from "@/lib/week";
 import { holidayMapForRange } from "@/lib/holidays";
@@ -28,7 +28,7 @@ function shiftMonth(y: number, m: number, delta: number): string {
 }
 
 export default async function KoledarPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireModule("koledar");
   const sp = await searchParams;
 
   const now = new Date();
@@ -40,7 +40,7 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
     month = Number(match[2]);
   }
 
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
   const activeYear = await getActiveSchoolYear(user.scope);
   const breaks = activeYear ? await getBreaksForYear(activeYear.id) : [];
 
@@ -98,7 +98,11 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
           repeat: isRecurring(o.event.recurrence) ? recurrenceLabel(o.event.recurrence) : null,
           range: o.endDate !== o.startDate ? rangeLabel(o.startDate, o.endDate) : rangeLabel(o.startDate, null),
           cancelled: o.cancelled,
+          note: o.event.description?.trim() || null,
+          location: o.event.location || null,
           timeChanged: Boolean(o.timeChanged),
+          dayNote: o.dayNote ?? null,
+          baseNote: o.baseNote?.trim() || null,
           startTime: o.event.startTime,
           endTime: o.event.endTime,
         })),
@@ -108,13 +112,13 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
   // Stranski seznam meseca
   const monthStart = `${year}-${pad2(month)}-01`;
   const monthEnd = rawCells.filter((c) => c.inMonth).at(-1)?.iso ?? last;
-  const monthList: Array<{ iso: string; kind: "holiday" | "break" | "event"; label: string; sub?: string; color?: string; cancelled?: boolean }> = [];
+  const monthList: Array<{ iso: string; kind: "holiday" | "break" | "event"; label: string; sub?: string; color?: string; cancelled?: boolean; end: string }> = [];
   for (const [iso, name] of holidays) {
-    if (dateInRange(iso, monthStart, monthEnd)) monthList.push({ iso, kind: "holiday", label: name });
+    if (dateInRange(iso, monthStart, monthEnd)) monthList.push({ iso, kind: "holiday", label: name, end: iso });
   }
   for (const b of breaks) {
     if (b.endDate >= monthStart && b.startDate <= monthEnd) {
-      monthList.push({ iso: b.startDate, kind: "break", label: b.name, sub: rangeLabel(b.startDate, b.endDate) });
+      monthList.push({ iso: b.startDate, kind: "break", label: b.name, sub: rangeLabel(b.startDate, b.endDate), end: b.endDate });
     }
   }
   for (const o of occs) {
@@ -128,10 +132,17 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
         }`,
         color: o.event.color,
         cancelled: o.cancelled,
+        end: o.endDate,
       });
     }
   }
-  monthList.sort((a, b) => a.iso.localeCompare(b.iso));
+  // Aktualni (današnji in prihajajoči) na vrhu, potekli na dnu; znotraj skupine po datumu
+  const isPast = (it: { end: string }) => it.end < today;
+  monthList.sort((a, b) => {
+    const pa = isPast(a) ? 1 : 0;
+    const pb = isPast(b) ? 1 : 0;
+    return pa - pb || a.iso.localeCompare(b.iso);
+  });
 
   const prevHref = `/koledar?m=${shiftMonth(year, month, -1)}`;
   const nextHref = `/koledar?m=${shiftMonth(year, month, 1)}`;
@@ -168,6 +179,7 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
             kids={kids.map((k) => ({ id: k.id, name: k.name }))}
             slotsByChild={slotsByChild}
             smtpReady={smtpConfigured()}
+            readOnly={user.isChild}
           />
         </div>
 
@@ -181,7 +193,10 @@ export default async function KoledarPage({ searchParams }: { searchParams: Prom
           ) : (
             <ul className="mt-4 max-h-[520px] space-y-2 overflow-y-auto pr-1">
               {monthList.map((item, i) => (
-                <li key={`${item.iso}-${i}`} className="flex items-start gap-2.5 text-[13px]">
+                <li
+                  key={`${item.iso}-${i}`}
+                  className={cn("flex items-start gap-2.5 text-[13px]", isPast(item) && "opacity-45 grayscale")}
+                >
                   <span
                     className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{

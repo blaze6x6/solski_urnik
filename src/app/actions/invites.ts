@@ -6,8 +6,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { invitations, users } from "@/db/schema";
 import { createSession, hashPassword, requireSuperadmin, requireUser } from "@/lib/auth";
-import { sendMail, smtpConfigured } from "@/lib/email";
-import { appOrigin, createInvite, findValidInvite, inviteMailHtml } from "@/lib/invites";
+import { deliverInvite, findValidInvite } from "@/lib/invites";
 import { notifyScope } from "@/lib/notifications";
 
 export type InviteState = { error?: string; ok?: string; link?: string } | undefined;
@@ -15,38 +14,7 @@ export type AcceptState = { error?: string } | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-async function sendInvite(opts: {
-  email: string;
-  scopeId: number | null;
-  inviter: { id: number; name: string };
-  groupOwnerName?: string;
-}): Promise<InviteState> {
-  const { token } = await createInvite({ email: opts.email, scopeId: opts.scopeId, invitedBy: opts.inviter.id });
-  const link = `${await appOrigin()}/vabilo?token=${token}`;
-
-  if (!smtpConfigured()) {
-    return {
-      ok: `Vabilo je ustvarjeno, a pošiljanje e-pošte na strežniku ni nastavljeno. Povezavo pošljite ročno (velja 7 dni).`,
-      link,
-    };
-  }
-  try {
-    await sendMail(
-      opts.email,
-      opts.scopeId === null ? "Vabilo v Šolski urnik" : "Vabilo v skupino — Šolski urnik",
-      inviteMailHtml({
-        link,
-        inviterName: opts.inviter.name,
-        newGroup: opts.scopeId === null,
-        groupOwnerName: opts.groupOwnerName,
-      }),
-    );
-  } catch (err) {
-    console.error("[vabilo] pošiljanje ni uspelo:", err);
-    return { error: "Pošiljanje e-pošte ni uspelo. Povezavo lahko pošljete ročno.", link };
-  }
-  return { ok: `Vabilo je poslano na ${opts.email}.`, link };
-}
+const sendInvite = deliverInvite;
 
 /** Superadministrator povabi nekoga, da ustvari NOVO, ločeno skupino. */
 export async function createGroupInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {

@@ -4,14 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { children, eventCancellations, eventReminders, events, eventTimeOverrides } from "@/db/schema";
+import { children, eventCancellations, eventReminders, events, eventOccurrenceNotes, eventTimeOverrides } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { eventScopeFilter } from "@/lib/data";
 import { notifyScope } from "@/lib/notifications";
 import { formatDayMonthSI } from "@/lib/time";
 import { sendEventCreatedMail } from "@/lib/event-mail";
 import { smtpConfigured } from "@/lib/email";
-import { RECURRENCE_OPTIONS } from "@/lib/recurrence";
+import { RECURRENCE_OPTIONS, isRecurring } from "@/lib/recurrence";
 
 const VALID_RECURRENCE = new Set(RECURRENCE_OPTIONS.map((o) => o.value as string));
 
@@ -109,6 +109,15 @@ export async function saveEventAction(formData: FormData): Promise<void> {
     saved = updated[0];
     if (saved) {
       await db.delete(eventReminders).where(eq(eventReminders.eventId, saved.id));
+      if (saved.recurrence === "none") {
+        // enkratni dogodek: ura, ki ste jo zdaj shranili, ne sme biti zasenčena s starim izjemnim časom,
+        // opomba za dan pa sledi (morebitni) novi dnevni oznaki dogodka
+        await db.delete(eventTimeOverrides).where(eq(eventTimeOverrides.eventId, saved.id));
+        await db
+          .update(eventOccurrenceNotes)
+          .set({ occurrenceDate: saved.startDate })
+          .where(eq(eventOccurrenceNotes.eventId, saved.id));
+      }
     }
   } else {
     const inserted = await db.insert(events).values(values).returning();
@@ -286,6 +295,75 @@ export async function setOccurrenceTimeAction(input: {
     "event",
     "updated",
     `Dogodek »${owned[0].title}« je ${formatDayMonthSI(date)} ob ${start}${end ? `–${end}` : ""}`,
+  );
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Doda, spremeni ali odstrani opombo samo za eno ponovitev dogodka
+ * (npr. »obvezno športna obutev«). Prazna opomba jo odstrani.
+ */
+export async function setOccurrenceNoteAction(input: {
+  eventId: number;
+  /** začetni datum ponovitve (YYYY-MM-DD) */
+  occurrenceDate: string;
+  note: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  const eventId = Number(input.eventId);
+  const date = String(input.occurrenceDate ?? "");
+  if (!eventId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Neveljaven termin." };
+
+  const ownedKids = (
+    await db.select({ id: children.id }).from(children).where(eq(children.userId, user.scope))
+  ).map((c) => c.id);
+  const owned = await db
+    .select({ id: events.id, title: events.title, recurrence: events.recurrence })
+    .from(events)
+    .where(and(eq(events.id, eventId), eventScopeFilter(ownedKids, user.scope)))
+    .limit(1);
+  if (!owned[0]) return { ok: false, error: "Dogodka ni mogoče najti." };
+
+  const note = String(input.note ?? "").trim().slice(0, 1000);
+
+  // enkratni dogodek: opomba je kar opis dogodka (vidna in urejiva tudi v meniju Dogodki)
+  if (!isRecurring(owned[0].recurrence)) {
+    await db.update(events).set({ description: note }).where(eq(events.id, eventId));
+    await db.delete(eventOccurrenceNotes).where(eq(eventOccurrenceNotes.eventId, eventId));
+    await notifyScope(
+      user,
+      "event",
+      "updated",
+      note
+        ? `Opomba pri »${owned[0].title}«: ${note.length > 120 ? `${note.slice(0, 117)}…` : note}`
+        : `Opomba pri »${owned[0].title}« je odstranjena`,
+    );
+    revalidatePath("/", "layout");
+    return { ok: true };
+  }
+
+  if (!note) {
+    await db
+      .delete(eventOccurrenceNotes)
+      .where(and(eq(eventOccurrenceNotes.eventId, eventId), eq(eventOccurrenceNotes.occurrenceDate, date)));
+    await notifyScope(user, "event", "updated", `Opomba za »${owned[0].title}« (${formatDayMonthSI(date)}) je odstranjena`);
+    revalidatePath("/", "layout");
+    return { ok: true };
+  }
+
+  await db
+    .insert(eventOccurrenceNotes)
+    .values({ eventId, occurrenceDate: date, note })
+    .onConflictDoUpdate({
+      target: [eventOccurrenceNotes.eventId, eventOccurrenceNotes.occurrenceDate],
+      set: { note },
+    });
+  await notifyScope(
+    user,
+    "event",
+    "updated",
+    `Opomba za »${owned[0].title}« (${formatDayMonthSI(date)}): ${note.length > 120 ? `${note.slice(0, 117)}…` : note}`,
   );
   revalidatePath("/", "layout");
   return { ok: true };

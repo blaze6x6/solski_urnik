@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
-import { requireUser } from "@/lib/auth";
-import { getActiveSchoolYear, getBreaksForYear, getChildren, getSubjects } from "@/lib/data";
-import { buildChildWeek } from "@/lib/week";
+import { requireModule } from "@/lib/auth";
+import { getActiveSchoolYear, getBreaksForYear, getSlots, getSubjects, getVisibleChildren } from "@/lib/data";
+import { smtpConfigured } from "@/lib/email";
+import { buildChildWeek, slotTitle } from "@/lib/week";
 import { cn } from "@/lib/colors";
 import { ChildDetailsTrigger } from "@/components/child-details-modal";
 import { TimetableGrid } from "@/components/timetable-grid";
@@ -13,10 +14,10 @@ export const metadata = { title: "Urnik" };
 type SearchParams = { otrok?: string; teden?: string; prikaz?: string };
 
 export default async function UrnikPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireModule("urnik");
   const sp = await searchParams;
 
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
   const year = await getActiveSchoolYear(user.scope);
   const breaks = year ? await getBreaksForYear(year.id) : [];
 
@@ -24,10 +25,12 @@ export default async function UrnikPage({ searchParams }: { searchParams: Promis
     return (
       <div className="card mx-auto max-w-xl px-8 py-14 text-center">
         <h1 className="font-display text-2xl font-semibold">Ni dodanih otrok</h1>
-        <p className="mt-3 text-sm text-ink-soft">Najprej dodajte otroka v nastavitvah.</p>
-        <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">
-          Odpri nastavitve
-        </Link>
+        <p className="mt-3 text-sm text-ink-soft">{user.isChild ? "Za ta profil ni podatkov." : "Najprej dodajte otroka v nastavitvah."}</p>
+        {user.isChild ? null : (
+          <Link href="/nastavitve?tab=otroci" className="btn btn-primary mt-6">
+            Odpri nastavitve
+          </Link>
+        )}
       </div>
     );
   }
@@ -59,6 +62,21 @@ export default async function UrnikPage({ searchParams }: { searchParams: Promis
     colorIdx: s.colorIdx,
   }));
   const weekLabel = weeks[0]?.weekLabel ?? "";
+
+  // podatki za obrazec »Dodaj dogodek« v oknu celice
+  const eventKids = kids.map((k) => ({ id: k.id, name: k.name }));
+  const slotsByChild: Record<number, Array<{ id: number; period: number; title: string; kind: string; start: string; end: string }>> = {};
+  for (const k of kids) {
+    slotsByChild[k.id] = (await getSlots(k.id)).map((s) => ({
+      id: s.id,
+      period: s.period,
+      title: slotTitle(s),
+      kind: s.kind,
+      start: s.start,
+      end: s.end,
+    }));
+  }
+  const smtpReady = smtpConfigured();
 
   return (
     <div>
@@ -152,6 +170,10 @@ export default async function UrnikPage({ searchParams }: { searchParams: Promis
                 prevHref={qs({ teden: weekOffset - 1 })}
                 nextHref={qs({ teden: weekOffset + 1 })}
                 independent={showAll}
+                eventKids={eventKids}
+                slotsByChild={slotsByChild}
+                smtpReady={smtpReady}
+                readOnly={user.isChild}
               />
             </section>
           );

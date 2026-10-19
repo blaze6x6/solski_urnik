@@ -32,7 +32,7 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
                 ? "Ustvarite svoj račun v aplikaciji Šolski urnik. Postali boste administrator svoje družine in lahko povabili še druge člane."
                 : `Ustvarite račun in se pridružite skupini${groupOwner ? ` »${groupOwner}«` : ""}. Videli boste iste otroke, urnike in dogodke.`}
             </p>
-            <AcceptInviteForm token={token} email={invite.email} />
+            <AcceptInviteForm token={token} email={invite.email} defaultName={invite.name ?? ""} />
           </>
         ) : (
           <>

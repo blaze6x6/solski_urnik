@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
-import { getBusRoutes, getBusTimetables, getChildren } from "@/lib/data";
+import { requireModule } from "@/lib/auth";
+import { getBusRoutes, getBusTimetables, getVisibleChildren } from "@/lib/data";
 import { parseTimetable } from "@/lib/bus-timetable";
 import { BusTimetableCard } from "@/components/bus-timetable-card";
 import { BusTimetableEditor } from "@/components/bus-timetable-editor";
@@ -15,11 +15,13 @@ export const metadata = { title: "Avtobus" };
 type SearchParams = { otrok?: string; uredi?: string; pogled?: string; vr?: string };
 
 export default async function AvtobusPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requireUser();
+  const user = await requireModule("avtobus");
   const sp = await searchParams;
+  // otroški profil: samo ogled voznih časov (brez urejanja in voznih redov za tisk)
+  const readOnly = user.isChild;
 
   const Tabs = ({ active }: { active: "poti" | "redi" }) => (
-    <div className="mb-5 flex flex-wrap gap-2">
+    readOnly ? null : <div className="mb-5 flex flex-wrap gap-2">
       <Link href="/avtobus" className={cn("chip-btn", active === "poti" && "chip-btn-active")}>
         Moji avtobusi
       </Link>
@@ -29,7 +31,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
     </div>
   );
 
-  if (sp.pogled === "redi") {
+  if (!readOnly && sp.pogled === "redi") {
     const all = await getBusTimetables(user.scope);
     const isNew = sp.vr === "nov";
     const edit = isNew ? null : all.find((t) => t.id === Number(sp.vr)) ?? null;
@@ -77,7 +79,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
     );
   }
 
-  const kids = await getChildren(user.scope);
+  const kids = await getVisibleChildren(user);
 
   if (kids.length === 0) {
     return (
@@ -125,6 +127,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
                     </>
                   ) : null}
                 </div>
+                {readOnly ? null : (
                 <div className="no-print flex shrink-0 gap-1">
                   <Link href={`/avtobus?otrok=${selected.id}&uredi=${r.id}`} className="icon-btn" title="Uredi">
                     <Pencil className="h-4 w-4" strokeWidth={2.2} />
@@ -137,6 +140,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
                     </button>
                   </form>
                 </div>
+                )}
               </div>
               {r.stop ? <p className="mt-1 text-sm text-ink-soft">{r.stop}</p> : null}
               <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -188,6 +192,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px]">
         <Column title="V šolo" list={toRoutes} />
         <Column title="Iz šole" list={fromRoutes} />
+        {readOnly ? null : (
         <div className="min-w-0 md:col-span-2 2xl:sticky 2xl:top-20 2xl:col-span-1">
           <BusForm key={editing?.id ?? "nov"} childId={selected.id} route={editing} />
           {editing ? (
@@ -196,6 +201,7 @@ export default async function AvtobusPage({ searchParams }: { searchParams: Prom
             </Link>
           ) : null}
         </div>
+        )}
       </div>
     </div>
   );
